@@ -86,6 +86,103 @@
   box-shadow: 0 6px 20px rgba(255, 0, 110, 0.4);
 }
 
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-left: auto;
+}
+
+.username {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #4a5568;
+  font-size: 0.95rem;
+}
+
+.username svg {
+  color: #667eea;
+}
+
+.logout-button,
+.login-button-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #e4405f 0%, #ff006e 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 700;
+  transition: all 0.3s ease;
+}
+
+.logout-button:hover,
+.login-button-nav:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(228, 64, 95, 0.4);
+}
+
+.login-button-nav {
+  background: linear-gradient(135deg, #ff006e 0%, #8338ec 100%);
+}
+
+.login-button-nav:hover {
+  box-shadow: 0 6px 20px rgba(255, 0, 110, 0.4);
+}
+
+.auth-prompt,
+.auth-required {
+  text-align: center;
+  padding: 40px 20px;
+  background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 100%);
+  border-radius: 16px;
+  border: 2px solid #e0e0e0;
+  margin: 40px 0;
+}
+
+.auth-prompt p,
+.auth-required p {
+  color: #666;
+  font-size: 1.1rem;
+  margin-bottom: 20px;
+}
+
+.auth-prompt-button {
+  padding: 12px 30px;
+  background: linear-gradient(135deg, #ff006e 0%, #8338ec 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.auth-prompt-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 0, 110, 0.4);
+}
+
+.auth-required h2 {
+  font-size: 1.5rem;
+  color: #333;
+  margin-bottom: 10px;
+  background: linear-gradient(135deg, #ff006e 0%, #8338ec 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
 @media (max-width: 768px) {
   .container {
     padding: 20px;

@@ -1,6 +1,18 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import './RegistrationForm.css';
 import { saveEntity } from '../utils/storage';
+import { getCurrentUser } from '../utils/auth';
+import {
+  sanitizeText,
+  sanitizeUrl,
+  validateEmail,
+  validatePhone,
+  validateLength,
+  checkRateLimit,
+  validateFileType,
+  validateFileSize,
+  sanitizeFormData
+} from '../utils/security';
 import {
   FaFacebook,
   FaTwitter,
@@ -92,6 +104,7 @@ function RegistrationForm({ entity, onSave, onCancel }) {
   const [errors, setErrors] = useState({});
   const [submitted, setSubmitted] = useState(false);
   const [logoPreview, setLogoPreview] = useState(entity?.logo || null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Update form when entity prop changes
   useEffect(() => {
@@ -102,10 +115,43 @@ function RegistrationForm({ entity, onSave, onCancel }) {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    
+    // Apply length limits based on field
+    let sanitizedValue = value;
+    const maxLengths = {
+      entityName: 100,
+      email: 254,
+      website: 500,
+      phone: 20,
+      address: 200,
+      city: 100,
+      country: 100,
+      description: 2000
+    };
+    
+    if (maxLengths[name] && value.length > maxLengths[name]) {
+      sanitizedValue = value.substring(0, maxLengths[name]);
+    }
+    
+    // Sanitize input based on field type
+    if (name === 'entityName' || name === 'address' || name === 'city' || name === 'country') {
+      sanitizedValue = sanitizeText(sanitizedValue);
+    } else if (name === 'email') {
+      sanitizedValue = sanitizeText(sanitizedValue).toLowerCase().trim();
+    } else if (name === 'phone') {
+      sanitizedValue = sanitizeText(sanitizedValue);
+    } else if (name === 'description') {
+      sanitizedValue = sanitizeText(sanitizedValue);
+    } else if (name === 'website') {
+      // Don't sanitize URL during typing, only validate on blur/submit
+      sanitizedValue = value;
+    }
+    
     setFormData((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: sanitizedValue,
     }));
+    
     // Clear error when user starts typing
     if (errors[name]) {
       setErrors((prev) => ({
@@ -116,32 +162,58 @@ function RegistrationForm({ entity, onSave, onCancel }) {
   };
 
   const handleSocialMediaChange = (platform, value) => {
+    // Limit URL length
+    const maxUrlLength = 500;
+    const sanitizedValue = value.length > maxUrlLength ? value.substring(0, maxUrlLength) : value;
+    
     setFormData((prev) => ({
       ...prev,
       socialMedia: {
         ...prev.socialMedia,
-        [platform]: value,
+        [platform]: sanitizedValue,
       },
     }));
+    
+    // Clear error when user starts typing
+    const errorKey = `social_${platform}`;
+    if (errors[errorKey]) {
+      setErrors((prev) => ({
+        ...prev,
+        [errorKey]: '',
+      }));
+    }
   };
 
   const handleLogoChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
+      // Validate file type using security utility
+      if (!validateFileType(file)) {
         setErrors((prev) => ({
           ...prev,
-          logo: 'Please select an image file',
+          logo: 'Please select a valid image file (JPEG, PNG, GIF, or WebP)',
         }));
         return;
       }
 
-      // Validate file size (max 2MB)
-      if (file.size > 2 * 1024 * 1024) {
+      // Validate file size using security utility
+      if (!validateFileSize(file, 2)) {
         setErrors((prev) => ({
           ...prev,
           logo: 'Image size must be less than 2MB',
+        }));
+        return;
+      }
+
+      // Additional security: Check file extension matches MIME type
+      const validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+      const fileName = file.name.toLowerCase();
+      const hasValidExtension = validExtensions.some(ext => fileName.endsWith(ext));
+      
+      if (!hasValidExtension) {
+        setErrors((prev) => ({
+          ...prev,
+          logo: 'File extension does not match file type',
         }));
         return;
       }
@@ -150,6 +222,16 @@ function RegistrationForm({ entity, onSave, onCancel }) {
       const reader = new FileReader();
       reader.onloadend = () => {
         const logoDataUrl = reader.result;
+        
+        // Additional validation: Ensure data URL is valid image
+        if (!logoDataUrl.startsWith('data:image/')) {
+          setErrors((prev) => ({
+            ...prev,
+            logo: 'Invalid image file',
+          }));
+          return;
+        }
+        
         setFormData((prev) => ({
           ...prev,
           logo: logoDataUrl,
@@ -182,16 +264,6 @@ function RegistrationForm({ entity, onSave, onCancel }) {
     }));
   };
 
-  const validateUrl = (url) => {
-    if (!url) return true; // Optional field
-    try {
-      new URL(url);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
   // Check if form has been modified
   const hasFormChanged = () => {
     // Create a copy without logo for comparison (logo is data URL which can be large)
@@ -208,18 +280,50 @@ function RegistrationForm({ entity, onSave, onCancel }) {
   const validateForm = () => {
     const newErrors = {};
 
+    // Validate entity name with length check
     if (!formData.entityName.trim()) {
       newErrors.entityName = 'Company/Brand name is required';
+    } else if (!validateLength(formData.entityName, 1, 100)) {
+      newErrors.entityName = 'Company/Brand name must be between 1 and 100 characters';
     }
 
+    // Validate email using security utility
     if (!formData.email.trim()) {
       newErrors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+    } else if (!validateEmail(formData.email)) {
       newErrors.email = 'Please enter a valid email address';
     }
 
-    if (formData.website && !validateUrl(formData.website)) {
-      newErrors.website = 'Please enter a valid URL';
+    // Validate website URL with security checks
+    if (formData.website && formData.website.trim()) {
+      const sanitizedUrl = sanitizeUrl(formData.website);
+      if (!sanitizedUrl) {
+        newErrors.website = 'Please enter a valid URL (HTTP or HTTPS only)';
+      } else if (!validateLength(formData.website, 0, 500)) {
+        newErrors.website = 'URL must be less than 500 characters';
+      }
+    }
+
+    // Validate phone
+    if (formData.phone && formData.phone.trim() && !validatePhone(formData.phone)) {
+      newErrors.phone = 'Please enter a valid phone number';
+    }
+
+    // Validate text fields length
+    if (formData.description && !validateLength(formData.description, 0, 2000)) {
+      newErrors.description = 'Description must be less than 2000 characters';
+    }
+    
+    if (formData.address && !validateLength(formData.address, 0, 200)) {
+      newErrors.address = 'Address must be less than 200 characters';
+    }
+    
+    if (formData.city && !validateLength(formData.city, 0, 100)) {
+      newErrors.city = 'City must be less than 100 characters';
+    }
+    
+    if (formData.country && !validateLength(formData.country, 0, 100)) {
+      newErrors.country = 'Country must be less than 100 characters';
     }
 
     // Validate social media URLs - only check if they differ from default domain
@@ -227,8 +331,13 @@ function RegistrationForm({ entity, onSave, onCancel }) {
       const url = formData.socialMedia[platform];
       const platformData = socialMediaPlatforms.find(p => p.name.toLowerCase() === platform);
       // Only validate if URL is different from default domain (user has modified it)
-      if (url && url !== platformData?.defaultDomain && !validateUrl(url)) {
-        newErrors[`social_${platform}`] = `Please enter a valid URL for ${platform}`;
+      if (url && url !== platformData?.defaultDomain) {
+        const sanitizedUrl = sanitizeUrl(url);
+        if (!sanitizedUrl) {
+          newErrors[`social_${platform}`] = `Please enter a valid URL for ${platform} (HTTP or HTTPS only)`;
+        } else if (!validateLength(url, 0, 500)) {
+          newErrors[`social_${platform}`] = `URL must be less than 500 characters`;
+        }
       }
     });
 
@@ -239,6 +348,20 @@ function RegistrationForm({ entity, onSave, onCancel }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     
+    // Prevent double submission
+    if (isSubmitting) {
+      return;
+    }
+    
+    // Rate limiting check
+    const rateLimitCheck = checkRateLimit('form_submission', 5, 15);
+    if (!rateLimitCheck.allowed) {
+      setErrors({
+        general: `Too many submissions. Please wait ${rateLimitCheck.timeRemaining} minute(s) before trying again.`
+      });
+      return;
+    }
+    
     // Check if form has been modified
     if (!hasFormChanged()) {
       setErrors({ general: 'Please update at least one field before submitting.' });
@@ -246,40 +369,65 @@ function RegistrationForm({ entity, onSave, onCancel }) {
     }
 
     if (validateForm()) {
+      setIsSubmitting(true);
+      
+      // Sanitize all form data before saving
+      const sanitizedFormData = sanitizeFormData(formData);
+      
       // Filter out default domains from social media before saving
       const socialMediaToSave = {};
-      Object.keys(formData.socialMedia).forEach((platform) => {
-        const url = formData.socialMedia[platform];
+      Object.keys(sanitizedFormData.socialMedia).forEach((platform) => {
+        const url = sanitizedFormData.socialMedia[platform];
         const platformData = socialMediaPlatforms.find(p => p.name.toLowerCase() === platform);
-        // Only save if URL is different from default domain
+        // Only save if URL is different from default domain and is valid
         if (url && url !== platformData?.defaultDomain) {
-          socialMediaToSave[platform] = url;
+          const sanitizedUrl = sanitizeUrl(url);
+          if (sanitizedUrl) {
+            socialMediaToSave[platform] = sanitizedUrl;
+          }
         }
       });
 
       const dataToSave = {
-        ...formData,
+        ...sanitizedFormData,
         id: entity?.id, // Preserve ID if editing
         socialMedia: socialMediaToSave,
       };
 
-      // Save to localStorage
-      const savedEntity = saveEntity(dataToSave);
+      try {
+        // Get current user
+        const user = getCurrentUser();
+        if (!user) {
+          setErrors({ general: 'You must be logged in to save profiles. Please sign in.' });
+          setIsSubmitting(false);
+          return;
+        }
+        
+        // Save to localStorage with user ID
+        const savedEntity = saveEntity(dataToSave, user.id);
 
-      console.log('Form submitted:', savedEntity);
-      setSubmitted(true);
-      
-      setTimeout(() => {
-        setSubmitted(false);
-        // Call onSave callback to notify parent
-        if (onSave) {
-          onSave();
-        }
-        // Reset form to initial state with default domains
-        if (!entity) {
-          setFormData(initialFormData);
-        }
-      }, 1500);
+        console.log('Form submitted:', savedEntity);
+        setSubmitted(true);
+        
+        setTimeout(() => {
+          setSubmitted(false);
+          setIsSubmitting(false);
+          // Call onSave callback to notify parent
+          if (onSave) {
+            onSave();
+          }
+          // Reset form to initial state with default domains
+          if (!entity) {
+            setFormData(initialFormData);
+          }
+        }, 1500);
+      } catch (error) {
+        console.error('Error saving form:', error);
+        setErrors({ general: error.message || 'An error occurred while saving. Please try again.' });
+        setIsSubmitting(false);
+      }
+    } else {
+      setIsSubmitting(false);
     }
   };
 
@@ -310,6 +458,7 @@ function RegistrationForm({ entity, onSave, onCancel }) {
               onChange={handleInputChange}
               className={errors.entityName ? 'error' : ''}
               placeholder="Enter your company or brand name"
+              maxLength={100}
             />
             {errors.entityName && <span className="error-message">{errors.entityName}</span>}
           </div>
@@ -339,7 +488,7 @@ function RegistrationForm({ entity, onSave, onCancel }) {
                     type="file"
                     id="logo"
                     name="logo"
-                    accept="image/*"
+                    accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
                     onChange={handleLogoChange}
                     className="logo-input"
                   />
@@ -362,6 +511,7 @@ function RegistrationForm({ entity, onSave, onCancel }) {
               onChange={handleInputChange}
               className={errors.email ? 'error' : ''}
               placeholder="contact@example.com"
+              maxLength={254}
             />
             {errors.email && <span className="error-message">{errors.email}</span>}
           </div>
@@ -375,6 +525,7 @@ function RegistrationForm({ entity, onSave, onCancel }) {
               onChange={handleInputChange}
               rows="4"
               placeholder="Tell your story... Share what's in your heart"
+              maxLength={2000}
             />
           </div>
 
@@ -388,6 +539,7 @@ function RegistrationForm({ entity, onSave, onCancel }) {
               onChange={handleInputChange}
               className={errors.website ? 'error' : ''}
               placeholder="https://www.example.com"
+              maxLength={500}
             />
             {errors.website && <span className="error-message">{errors.website}</span>}
           </div>
@@ -401,6 +553,7 @@ function RegistrationForm({ entity, onSave, onCancel }) {
               value={formData.phone}
               onChange={handleInputChange}
               placeholder="+1 (555) 123-4567"
+              maxLength={20}
             />
           </div>
         </div>
@@ -418,6 +571,7 @@ function RegistrationForm({ entity, onSave, onCancel }) {
               value={formData.address}
               onChange={handleInputChange}
               placeholder="Street address"
+              maxLength={200}
             />
           </div>
 
@@ -430,6 +584,7 @@ function RegistrationForm({ entity, onSave, onCancel }) {
               value={formData.city}
               onChange={handleInputChange}
               placeholder="City"
+              maxLength={100}
             />
           </div>
 
@@ -442,6 +597,7 @@ function RegistrationForm({ entity, onSave, onCancel }) {
               value={formData.country}
               onChange={handleInputChange}
               placeholder="Country"
+              maxLength={100}
             />
           </div>
         </div>
@@ -473,6 +629,7 @@ function RegistrationForm({ entity, onSave, onCancel }) {
                     onChange={(e) => handleSocialMediaChange(platformKey, e.target.value)}
                     className={errors[errorKey] ? 'error' : ''}
                     placeholder={platform.placeholder}
+                    maxLength={500}
                   />
                   {errors[errorKey] && (
                     <span className="error-message-small">{errors[errorKey]}</span>
@@ -500,10 +657,14 @@ function RegistrationForm({ entity, onSave, onCancel }) {
           )}
           <button 
             type="submit" 
-            className={`submit-button ${!hasFormChanged() ? 'disabled' : ''}`}
-            disabled={!hasFormChanged()}
+            className={`submit-button ${!hasFormChanged() || isSubmitting ? 'disabled' : ''}`}
+            disabled={!hasFormChanged() || isSubmitting}
           >
-            {hasFormChanged() ? (entity ? 'Update Entity' : 'Register Entity') : 'No Changes Made'}
+            {isSubmitting 
+              ? 'Submitting...' 
+              : hasFormChanged() 
+                ? (entity ? 'Update Entity' : 'Register Entity') 
+                : 'No Changes Made'}
           </button>
         </div>
       </div>

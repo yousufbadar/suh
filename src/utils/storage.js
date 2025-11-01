@@ -15,15 +15,19 @@ const generateUUID = () => {
   });
 };
 
-export const saveEntity = (entity) => {
+export const saveEntity = (entity, userId) => {
+  if (!userId) {
+    throw new Error('User must be authenticated to save profiles');
+  }
+  
   const entities = getEntities(); // Get all entities
-  const isNewEntity = !entity.id;
   
   const newEntity = {
     ...entity,
     id: entity.id || Date.now().toString(),
     // Generate UUID for new entities or preserve existing UUID
     uuid: entity.uuid || generateUUID(),
+    userId: userId, // Link entity to user
     active: entity.active !== undefined ? entity.active : true, // Default to active
     createdAt: entity.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -51,10 +55,16 @@ export const saveEntity = (entity) => {
   }
 };
 
-export const getEntities = () => {
+export const getEntities = (userId = null) => {
   try {
     const data = localStorage.getItem(STORAGE_KEY);
     const entities = data ? JSON.parse(data) : [];
+    
+    // If userId provided, filter entities for that user
+    if (userId) {
+      return entities.filter(e => e.userId === userId);
+    }
+    
     // Return all entities including archived ones (they should be visible)
     return entities;
   } catch (error) {
@@ -63,8 +73,8 @@ export const getEntities = () => {
   }
 };
 
-export const getEntityById = (id) => {
-  const entities = getEntities();
+export const getEntityById = (id, userId = null) => {
+  const entities = getEntities(userId);
   return entities.find((e) => e.id === id);
 };
 
@@ -126,7 +136,7 @@ export const trackQRScan = (uuid) => {
   // Don't track if entity is archived/inactive
   if (entity.active === false) return;
 
-  const entities = getEntities();
+  const entities = getEntities(); // Get all entities for tracking
   const entityIndex = entities.findIndex((e) => e.uuid === uuid);
 
   if (entityIndex >= 0) {
@@ -141,13 +151,13 @@ export const trackQRScan = (uuid) => {
 
 // Track social media click
 export const trackSocialClick = (entityId, platform) => {
-  const entity = getEntityById(entityId);
+  const entity = getEntityById(entityId); // No userId filter for tracking
   if (!entity) return;
   
   // Don't track if entity is archived/inactive
   if (entity.active === false) return;
 
-  const entities = getEntities();
+  const entities = getEntities(); // Get all entities for tracking
   const entityIndex = entities.findIndex((e) => e.id === entityId);
 
   if (entityIndex >= 0) {
