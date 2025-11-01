@@ -1,0 +1,21 @@
+.location-map-container {
+  width: 100%;
+  height: 300px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 2px solid #e0e0e0;
+}
+
+.location-map-container .leaflet-container {
+  height: 100%;
+  width: 100%;
+  z-index: 0;
+}
+
+@media (max-width: 768px) {
+  .location-map-container {
+    height: 250px;
+  }
+}
+
