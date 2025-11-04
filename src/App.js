@@ -1,15 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 import Home from './components/Home';
-import Login from './components/Login';
 import RegistrationForm from './components/RegistrationForm';
 import EntityList from './components/EntityList';
 import EntityView from './components/EntityView';
 import SocialMediaIconsPage from './components/SocialMediaIconsPage';
 import ConfirmDialog from './components/ConfirmDialog';
 import { getEntities, deactivateEntity, reactivateEntity } from './utils/storage';
-import { getCurrentUser, logoutUser, isAuthenticated } from './utils/auth';
-import { FaSignOutAlt, FaUser, FaSignInAlt } from 'react-icons/fa';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('home'); // 'home', 'list', 'register', 'view', 'edit', 'icons'
@@ -19,15 +16,10 @@ function App() {
   const [uuid, setUuid] = useState(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [entityToDelete, setEntityToDelete] = useState(null);
-  const [currentUser, setCurrentUser] = useState(null);
-  const [showLogin, setShowLogin] = useState(false);
 
   useEffect(() => {
-    // Check authentication
-    const user = getCurrentUser();
-    setCurrentUser(user);
-    
-    loadEntities(user?.id);
+    // Load all entities (no authentication required)
+    loadEntities();
     
     // Check URL for UUID parameter
     const urlParams = new URLSearchParams(window.location.search);
@@ -43,27 +35,11 @@ function App() {
     }
   }, []);
 
-  const loadEntities = (userId = null) => {
-    const loadedEntities = getEntities(userId); // Get entities for current user
+  const loadEntities = () => {
+    const loadedEntities = getEntities(); // Get all entities
     setEntities(loadedEntities);
   };
 
-  const handleLoginSuccess = (user) => {
-    setCurrentUser(user);
-    setShowLogin(false);
-    loadEntities(user.id);
-    // Redirect to list page after login
-    if (currentPage === 'home' || !isAuthenticated()) {
-      setCurrentPage('list');
-    }
-  };
-
-  const handleLogout = () => {
-    logoutUser();
-    setCurrentUser(null);
-    setEntities([]);
-    setCurrentPage('home');
-  };
 
   const handleViewEntity = (entity) => {
     setSelectedEntity(entity);
@@ -71,30 +47,14 @@ function App() {
   };
 
   const handleEditEntity = (entity) => {
-    // Check if user owns this entity
-    if (!currentUser) {
-      setShowLogin(true);
-      return;
-    }
-    if (entity.userId !== currentUser.id) {
-      alert('You can only edit your own profiles');
-      return;
-    }
+    // No authentication required - anyone can edit
     setEditingEntity(entity);
     setCurrentPage('register');
   };
 
   const handleDeleteEntity = (id) => {
-    if (!currentUser) {
-      setShowLogin(true);
-      return;
-    }
+    // No authentication required - anyone can delete
     const entity = entities.find((e) => e.id === id);
-    // Check if user owns this entity
-    if (entity && entity.userId !== currentUser.id) {
-      alert('You can only delete your own profiles');
-      return;
-    }
     setEntityToDelete(entity);
     setShowConfirmDialog(true);
   };
@@ -102,7 +62,7 @@ function App() {
   const confirmDeactivate = () => {
     if (entityToDelete) {
       deactivateEntity(entityToDelete.id);
-      loadEntities(currentUser?.id);
+      loadEntities();
       if (selectedEntity?.id === entityToDelete.id) {
         setSelectedEntity(null);
         setCurrentPage('list');
@@ -119,14 +79,10 @@ function App() {
 
   const handleReactivateEntity = (id) => {
     reactivateEntity(id);
-    loadEntities(currentUser?.id);
+    loadEntities();
   };
 
   const handleRegisterNew = () => {
-    if (!currentUser) {
-      setShowLogin(true);
-      return;
-    }
     setEditingEntity(null);
     setCurrentPage('register');
   };
@@ -134,23 +90,15 @@ function App() {
   const handleBackToList = () => {
     setSelectedEntity(null);
     setEditingEntity(null);
-    if (currentUser) {
-      setCurrentPage('list');
-    } else {
-      setCurrentPage('home');
-    }
+    setCurrentPage('list');
   };
 
   const handleGetStarted = () => {
-    if (currentUser) {
-      setCurrentPage('list');
-    } else {
-      setShowLogin(true);
-    }
+    setCurrentPage('list');
   };
 
   const handleEntitySaved = () => {
-    loadEntities(currentUser?.id);
+    loadEntities();
     setEditingEntity(null);
     setCurrentPage('list');
   };
@@ -162,27 +110,11 @@ function App() {
 
   // Render home page
   if (currentPage === 'home') {
-    return (
-      <>
-        {showLogin && (
-          <Login 
-            onLoginSuccess={handleLoginSuccess} 
-            onClose={() => setShowLogin(false)}
-          />
-        )}
-        <Home onGetStarted={handleGetStarted} />
-      </>
-    );
+    return <Home onGetStarted={handleGetStarted} />;
   }
 
   return (
     <div className="App">
-      {showLogin && (
-        <Login 
-          onLoginSuccess={handleLoginSuccess} 
-          onClose={() => setShowLogin(false)}
-        />
-      )}
       <ConfirmDialog
         isOpen={showConfirmDialog}
         title="Archive Profile"
@@ -207,91 +139,45 @@ function App() {
           >
             Profiles
           </button>
-          {currentUser ? (
-            <>
-              <button
-                onClick={handleRegisterNew}
-                className={`nav-button ${currentPage === 'register' ? 'active' : ''}`}
-              >
-                {editingEntity ? 'Edit Profile' : 'Create Profile'}
-              </button>
-              <div className="user-info">
-                <span className="username">
-                  <FaUser /> {currentUser.username}
-                </span>
-                <button
-                  onClick={handleLogout}
-                  className="logout-button"
-                  title="Logout"
-                >
-                  <FaSignOutAlt /> Logout
-                </button>
-              </div>
-            </>
-          ) : (
-            <button
-              onClick={() => setShowLogin(true)}
-              className="nav-button login-button-nav"
-            >
-              <FaSignInAlt /> Sign In
-            </button>
-          )}
+          <button
+            onClick={handleRegisterNew}
+            className={`nav-button ${currentPage === 'register' ? 'active' : ''}`}
+          >
+            {editingEntity ? 'Edit Profile' : 'Create Profile'}
+          </button>
         </nav>
 
         {currentPage === 'list' && (
           <>
             <h1 className="app-title">Speak your heart online</h1>
             <p className="app-subtitle">
-              {currentUser 
-                ? `Welcome back, ${currentUser.username}! View and manage your profiles`
-                : 'View and manage your profiles'}
+              View and manage your profiles
             </p>
-            {!currentUser ? (
-              <div className="auth-prompt">
-                <p>Please sign in to view and manage your profiles</p>
-                <button onClick={() => setShowLogin(true)} className="auth-prompt-button">
-                  <FaSignInAlt /> Sign In
-                </button>
-              </div>
-            ) : (
-              <EntityList
-                entities={entities}
-                onViewEntity={handleViewEntity}
-                onEditEntity={handleEditEntity}
-                onDeleteEntity={handleDeleteEntity}
-                onReactivateEntity={handleReactivateEntity}
-              />
-            )}
+            <EntityList
+              entities={entities}
+              onViewEntity={handleViewEntity}
+              onEditEntity={handleEditEntity}
+              onDeleteEntity={handleDeleteEntity}
+              onReactivateEntity={handleReactivateEntity}
+            />
           </>
         )}
 
         {currentPage === 'register' && (
           <>
-            {currentUser ? (
-              <>
-                <h1 className="app-title">
-                  {editingEntity ? 'Edit Profile' : 'Create Your Profile'}
-                </h1>
-                <p className="app-subtitle">
-                  {editingEntity
-                    ? 'Update your profile information'
-                    : 'Share your story and connect with your audience through social media'}
-                </p>
-                <RegistrationForm
-                  entity={editingEntity}
-                  onSave={handleEntitySaved}
-                  onCancel={handleBackToList}
-                />
-              </>
-            ) : (
-              <div className="auth-required">
-                <h2>Authentication Required</h2>
-                <p>Please sign in to create or edit profiles</p>
-                <button onClick={() => setShowLogin(true)} className="auth-prompt-button">
-                  <FaSignInAlt /> Sign In
-                </button>
-              </div>
-            )}
+            <h1 className="app-title">
+              {editingEntity ? 'Edit Profile' : 'Create Your Profile'}
+            </h1>
+            <p className="app-subtitle">
+              {editingEntity
+                ? 'Update your profile information'
+                : 'Share your story and connect with your audience through social media'}
+            </p>
+            <RegistrationForm
+              entity={editingEntity}
+              onSave={handleEntitySaved}
+              onCancel={handleBackToList}
+            />
           </>
         )}
 
@@ -303,7 +189,6 @@ function App() {
                     onBack={handleBackToList}
                     onEdit={(entity) => handleEditEntity(entity)}
                     onDelete={handleDeleteEntity}
-                    currentUser={currentUser}
                   />
                 )}
               </>

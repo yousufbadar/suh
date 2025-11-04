@@ -58,7 +58,7 @@ const socialMediaPlatforms = {
   flickr: { name: 'Flickr', icon: FaFlickr, color: '#ff0084' },
 };
 
-function EntityView({ entity, onBack, onEdit, onDelete, currentUser }) {
+function EntityView({ entity, onBack, onEdit, onDelete }) {
   const [copied, setCopied] = useState(false);
   const [currentEntity, setCurrentEntity] = useState(entity);
 
@@ -174,16 +174,14 @@ function EntityView({ entity, onBack, onEdit, onDelete, currentUser }) {
             <button onClick={onBack} className="back-button">
               <FaArrowLeft /> Back to Profiles
             </button>
-            {currentUser && currentUser.id === currentEntity.userId && (
-              <div className="entity-actions">
-                <button onClick={() => onEdit(currentEntity)} className="edit-button">
-                  <FaEdit /> Edit
-                </button>
-                <button onClick={() => onDelete(currentEntity.id)} className="delete-button">
-                  <FaTrash /> Delete
-                </button>
-              </div>
-            )}
+                <div className="entity-actions">
+                  <button onClick={() => onEdit(currentEntity)} className="edit-button">
+                    <FaEdit /> Edit
+                  </button>
+                  <button onClick={() => onDelete(currentEntity.id)} className="delete-button">
+                    <FaTrash /> Delete
+                  </button>
+                </div>
           </div>
 
       <div className="entity-card">

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import './RegistrationForm.css';
 import { saveEntity } from '../utils/storage';
-import { getCurrentUser } from '../utils/auth';
 import {
   sanitizeText,
   sanitizeUrl,
@@ -395,16 +394,8 @@ function RegistrationForm({ entity, onSave, onCancel }) {
       };
 
       try {
-        // Get current user
-        const user = getCurrentUser();
-        if (!user) {
-          setErrors({ general: 'You must be logged in to save profiles. Please sign in.' });
-          setIsSubmitting(false);
-          return;
-        }
-        
-        // Save to localStorage with user ID
-        const savedEntity = saveEntity(dataToSave, user.id);
+        // Save to localStorage (no authentication required)
+        const savedEntity = saveEntity(dataToSave);
 
         console.log('Form submitted:', savedEntity);
         setSubmitted(true);

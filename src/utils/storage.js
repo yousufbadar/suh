@@ -15,11 +15,7 @@ const generateUUID = () => {
   });
 };
 
-export const saveEntity = (entity, userId) => {
-  if (!userId) {
-    throw new Error('User must be authenticated to save profiles');
-  }
-  
+export const saveEntity = (entity, userId = null) => {
   const entities = getEntities(); // Get all entities
   
   const newEntity = {
@@ -27,7 +23,7 @@ export const saveEntity = (entity, userId) => {
     id: entity.id || Date.now().toString(),
     // Generate UUID for new entities or preserve existing UUID
     uuid: entity.uuid || generateUUID(),
-    userId: userId, // Link entity to user
+    userId: userId || 'anonymous', // Use anonymous if no user
     active: entity.active !== undefined ? entity.active : true, // Default to active
     createdAt: entity.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -60,12 +56,7 @@ export const getEntities = (userId = null) => {
     const data = localStorage.getItem(STORAGE_KEY);
     const entities = data ? JSON.parse(data) : [];
     
-    // If userId provided, filter entities for that user
-    if (userId) {
-      return entities.filter(e => e.userId === userId);
-    }
-    
-    // Return all entities including archived ones (they should be visible)
+    // Return all entities (no user filtering)
     return entities;
   } catch (error) {
     console.error('Error reading entities from storage:', error);
