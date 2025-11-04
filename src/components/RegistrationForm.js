@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import './RegistrationForm.css';
-import { saveEntity } from '../utils/storage';
-import { getCurrentUser } from '../utils/auth';
+import { createClient } from '@/lib/supabase/client';
 import {
   sanitizeText,
   sanitizeUrl,
@@ -71,9 +70,9 @@ function RegistrationForm({ entity, onSave, onCancel }) {
   const initialFormData = useMemo(() => {
     if (entity) {
       // Load entity data for editing - restore default domains for social media
-      const socialMedia = { ...getInitialSocialMedia(), ...(entity.socialMedia || {}) };
+      const socialMedia = { ...getInitialSocialMedia(), ...(entity.social_media || {}) };
       return {
-        entityName: entity.entityName || '',
+        entityName: entity.entity_name || '',
         description: entity.description || '',
         email: entity.email || '',
         website: entity.website || '',
@@ -82,7 +81,7 @@ function RegistrationForm({ entity, onSave, onCancel }) {
         city: entity.city || '',
         country: entity.country || '',
         socialMedia: socialMedia,
-        logo: entity.logo || null,
+        logo: entity.logo_url || null,
       };
     }
     return {
@@ -103,14 +102,16 @@ function RegistrationForm({ entity, onSave, onCancel }) {
   const [initialData, setInitialData] = useState(() => JSON.stringify(initialFormData));
   const [errors, setErrors] = useState({});
   const [submitted, setSubmitted] = useState(false);
-  const [logoPreview, setLogoPreview] = useState(entity?.logo || null);
+  const [logoPreview, setLogoPreview] = useState(entity?.logo_url || null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const supabase = createClient();
 
   // Update form when entity prop changes
   useEffect(() => {
     setFormData(initialFormData);
     setInitialData(JSON.stringify(initialFormData));
-    setLogoPreview(entity?.logo || null);
+    setLogoPreview(entity?.logo_url || null);
   }, [initialFormData, entity]);
 
   const handleInputChange = (e) => {
@@ -184,7 +185,7 @@ function RegistrationForm({ entity, onSave, onCancel }) {
     }
   };
 
-  const handleLogoChange = (e) => {
+  const handleLogoChange = async (e) => {
     const file = e.target.files[0];
     if (file) {
       // Validate file type using security utility
@@ -218,41 +219,81 @@ function RegistrationForm({ entity, onSave, onCancel }) {
         return;
       }
 
-      // Read file as data URL
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const logoDataUrl = reader.result;
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setErrors((prev) => ({
+          ...prev,
+          logo: 'You must be logged in to upload logos',
+        }));
+        return;
+      }
+
+      // Upload to Supabase Storage
+      setIsLoading(true);
+      try {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${user.id}/${Date.now()}.${fileExt}`;
         
-        // Additional validation: Ensure data URL is valid image
-        if (!logoDataUrl.startsWith('data:image/')) {
-          setErrors((prev) => ({
-            ...prev,
-            logo: 'Invalid image file',
-          }));
-          return;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('logos')
+          .upload(fileName, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (uploadError) {
+          throw uploadError;
         }
-        
+
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from('logos')
+          .getPublicUrl(fileName);
+
+        // Also create preview for immediate display
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setLogoPreview(reader.result);
+        };
+        reader.readAsDataURL(file);
+
         setFormData((prev) => ({
           ...prev,
-          logo: logoDataUrl,
+          logo: publicUrl, // Store URL instead of data URL
         }));
-        setLogoPreview(logoDataUrl);
         setErrors((prev) => ({
           ...prev,
           logo: '',
         }));
-      };
-      reader.onerror = () => {
+      } catch (error) {
+        console.error('Error uploading logo:', error);
         setErrors((prev) => ({
           ...prev,
-          logo: 'Error reading file',
+          logo: error.message || 'Error uploading file',
         }));
-      };
-      reader.readAsDataURL(file);
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
-  const handleRemoveLogo = () => {
+  const handleRemoveLogo = async () => {
+    // Delete from Supabase Storage if it exists
+    if (formData.logo && formData.logo.includes('supabase')) {
+      try {
+        const urlParts = formData.logo.split('/logos/');
+        if (urlParts[1]) {
+          const { error } = await supabase.storage
+            .from('logos')
+            .remove([urlParts[1]]);
+          // Don't throw error if file doesn't exist
+        }
+      } catch (error) {
+        console.warn('Error deleting logo from storage:', error);
+      }
+    }
+
     setFormData((prev) => ({
       ...prev,
       logo: null,
@@ -345,7 +386,7 @@ function RegistrationForm({ entity, onSave, onCancel }) {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     // Prevent double submission
@@ -396,17 +437,84 @@ function RegistrationForm({ entity, onSave, onCancel }) {
 
       try {
         // Get current user
-        const user = getCurrentUser();
-        if (!user) {
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (!user || userError) {
           setErrors({ general: 'You must be logged in to save profiles. Please sign in.' });
           setIsSubmitting(false);
           return;
         }
         
-        // Save to localStorage with user ID
-        const savedEntity = saveEntity(dataToSave, user.id);
+        // Prepare data for Supabase (convert camelCase to snake_case)
+        const profileData = {
+          entity_name: sanitizedFormData.entityName,
+          description: sanitizedFormData.description,
+          email: sanitizedFormData.email,
+          website: sanitizedFormData.website,
+          phone: sanitizedFormData.phone,
+          address: sanitizedFormData.address,
+          city: sanitizedFormData.city,
+          country: sanitizedFormData.country,
+          logo_url: sanitizedFormData.logo || null,
+          social_media: socialMediaToSave,
+          active: true,
+          updated_at: new Date().toISOString(),
+        };
 
-        console.log('Form submitted:', savedEntity);
+        let savedEntity;
+
+        if (entity?.id) {
+          // Update existing profile
+          const { data, error } = await supabase
+            .from('profiles')
+            .update(profileData)
+            .eq('id', entity.id)
+            .eq('user_id', user.id)
+            .select()
+            .single();
+
+          if (error) {
+            console.error('Supabase update error:', error);
+            throw error;
+          }
+          
+          if (!data) {
+            throw new Error('Profile was not updated. Please try again.');
+          }
+          
+          savedEntity = data;
+        } else {
+          // Create new profile - ensure required fields are present
+          if (!profileData.entity_name || profileData.entity_name.trim() === '') {
+            throw new Error('Company/Brand name is required');
+          }
+          if (!profileData.email || profileData.email.trim() === '') {
+            throw new Error('Email is required');
+          }
+
+          // Insert new profile - UUID will be auto-generated by database
+          const { data, error } = await supabase
+            .from('profiles')
+            .insert({
+              ...profileData,
+              user_id: user.id,
+              created_at: new Date().toISOString(),
+            })
+            .select()
+            .single();
+
+          if (error) {
+            console.error('Supabase insert error:', error);
+            throw new Error(error.message || 'Failed to save profile. Please try again.');
+          }
+          
+          if (!data) {
+            throw new Error('Profile was not created. Please try again.');
+          }
+          
+          savedEntity = data;
+        }
+
+        console.log('Form submitted successfully:', savedEntity);
         setSubmitted(true);
         
         setTimeout(() => {
@@ -423,7 +531,35 @@ function RegistrationForm({ entity, onSave, onCancel }) {
         }, 1500);
       } catch (error) {
         console.error('Error saving form:', error);
-        setErrors({ general: error.message || 'An error occurred while saving. Please try again.' });
+        console.error('Error details:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint
+        });
+        
+        // Extract more detailed error message
+        let errorMessage = 'An error occurred while saving. Please try again.';
+        if (error.message) {
+          errorMessage = error.message;
+        } else if (error.details) {
+          errorMessage = error.details;
+        } else if (error.hint) {
+          errorMessage = error.hint;
+        }
+        
+        // Handle specific Supabase errors
+        if (error.code === 'PGRST116') {
+          errorMessage = 'No rows found. Please check your profile exists.';
+        } else if (error.code === '23505') {
+          errorMessage = 'A profile with this information already exists.';
+        } else if (error.code === '42501') {
+          errorMessage = 'Permission denied. Please ensure you are logged in and have the correct permissions.';
+        } else if (error.code === 'PGRST301') {
+          errorMessage = 'Row Level Security policy violation. Please check your database permissions.';
+        }
+        
+        setErrors({ general: errorMessage });
         setIsSubmitting(false);
       }
     } else {

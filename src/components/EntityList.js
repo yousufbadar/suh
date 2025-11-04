@@ -123,12 +123,12 @@ function EntityList({ entities, onViewEntity, onEditEntity, onDeleteEntity, onRe
         {filteredEntities.map((entity) => (
           <div key={entity.id} className="entity-card-preview">
             <div className="entity-card-header">
-              <h3 className={`entity-card-name ${entity.active === false ? 'archived' : ''}`}>
-                {entity.entityName}
-                {entity.active === false && (
-                  <span className="archived-badge">Archived</span>
-                )}
-              </h3>
+                  <h3 className={`entity-card-name ${entity.active === false ? 'archived' : ''}`}>
+                    {entity.entity_name}
+                    {entity.active === false && (
+                      <span className="archived-badge">Archived</span>
+                    )}
+                  </h3>
               <div className="entity-card-actions">
                 {entity.active !== false ? (
                   <>
@@ -182,14 +182,14 @@ function EntityList({ entities, onViewEntity, onEditEntity, onDeleteEntity, onRe
                   </span>
                 </div>
               )}
-              {entity.socialMedia && Object.keys(entity.socialMedia).length > 0 && (
-                <div className="info-item">
-                  <span className="info-label">Social Links:</span>
-                  <span className="info-value">
-                    {Object.keys(entity.socialMedia).length} platform(s)
-                  </span>
-                </div>
-              )}
+                  {entity.social_media && Object.keys(entity.social_media).length > 0 && (
+                    <div className="info-item">
+                      <span className="info-label">Social Links:</span>
+                      <span className="info-value">
+                        {Object.keys(entity.social_media).length} platform(s)
+                      </span>
+                    </div>
+                  )}
             </div>
 
             <button

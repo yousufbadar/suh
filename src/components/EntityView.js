@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import './EntityView.css';
 import { QRCodeSVG } from 'qrcode.react';
 import LocationMap from './LocationMap';
-import { getEntityById, trackSocialClick } from '../utils/storage';
+import { createClient } from '@/lib/supabase/client';
 import {
   FaFacebook,
   FaTwitter,
@@ -61,6 +61,7 @@ const socialMediaPlatforms = {
 function EntityView({ entity, onBack, onEdit, onDelete, currentUser }) {
   const [copied, setCopied] = useState(false);
   const [currentEntity, setCurrentEntity] = useState(entity);
+  const supabase = createClient();
 
   // Update current entity when prop changes
   useEffect(() => {
@@ -70,17 +71,17 @@ function EntityView({ entity, onBack, onEdit, onDelete, currentUser }) {
   // Generate QR code with URL containing UUID
   // Must call hooks before any conditional returns
   const qrCodeValue = useMemo(() => {
-    if (!currentEntity) return '';
+    if (!currentEntity || !currentEntity.uuid) return '';
     // Generate URL to icons page with UUID
-    const baseUrl = window.location.origin;
-    return `${baseUrl}/?uuid=${currentEntity.uuid}`;
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+    return `${baseUrl}/icons?uuid=${currentEntity.uuid}`;
   }, [currentEntity]);
 
   // Get shareable link (same as QR code - points to icons page)
   const shareableLink = useMemo(() => {
-    if (!currentEntity) return '';
-    const baseUrl = window.location.origin;
-    return `${baseUrl}/?uuid=${currentEntity.uuid}`;
+    if (!currentEntity || !currentEntity.uuid) return '';
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+    return `${baseUrl}/icons?uuid=${currentEntity.uuid}`;
   }, [currentEntity]);
 
   const handleCopyLink = async () => {
@@ -129,7 +130,7 @@ function EntityView({ entity, onBack, onEdit, onDelete, currentUser }) {
         const downloadUrl = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = downloadUrl;
-                      link.download = `${currentEntity.entityName.replace(/\s+/g, '_')}_QR_Code.png`;
+                      link.download = `${(currentEntity.entity_name || 'profile').replace(/\s+/g, '_')}_QR_Code.png`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -142,15 +143,36 @@ function EntityView({ entity, onBack, onEdit, onDelete, currentUser }) {
     img.src = url;
   };
 
-  const handleSocialClick = (platform, url, entityId, e) => {
+  const handleSocialClick = async (platform, url, entityId, e) => {
     e.preventDefault();
-    // Track the click
-    trackSocialClick(entityId, platform);
-    // Reload entity data to reflect updated click count
-    const updatedEntity = getEntityById(entityId);
-    if (updatedEntity) {
-      setCurrentEntity(updatedEntity);
+    if (!currentEntity?.uuid || !currentEntity?.active) {
+      window.open(url, '_blank', 'noopener,noreferrer');
+      return;
     }
+
+    try {
+      // Track the click using Supabase function
+      const { error } = await supabase.rpc('track_social_click', {
+        profile_uuid: currentEntity.uuid,
+        platform: platform
+      });
+
+      if (!error) {
+        // Reload entity data to reflect updated click count
+        const { data, error: fetchError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', entityId)
+          .single();
+
+        if (!fetchError && data) {
+          setCurrentEntity(data);
+        }
+      }
+    } catch (error) {
+      console.error('Error tracking click:', error);
+    }
+
     // Open in new tab
     window.open(url, '_blank', 'noopener,noreferrer');
   };
@@ -166,7 +188,7 @@ function EntityView({ entity, onBack, onEdit, onDelete, currentUser }) {
     );
   }
 
-  const socialMediaLinks = Object.keys(currentEntity.socialMedia || {});
+  const socialMediaLinks = Object.keys(currentEntity.social_media || {});
 
   return (
     <div className="entity-view">
@@ -174,7 +196,7 @@ function EntityView({ entity, onBack, onEdit, onDelete, currentUser }) {
             <button onClick={onBack} className="back-button">
               <FaArrowLeft /> Back to Profiles
             </button>
-            {currentUser && currentUser.id === currentEntity.userId && (
+            {currentUser && currentUser.id === currentEntity.user_id && (
               <div className="entity-actions">
                 <button onClick={() => onEdit(currentEntity)} className="edit-button">
                   <FaEdit /> Edit
@@ -189,12 +211,12 @@ function EntityView({ entity, onBack, onEdit, onDelete, currentUser }) {
       <div className="entity-card">
         <div className="entity-header-top-section">
           <div className="entity-header-top">
-            {currentEntity.logo && (
+            {currentEntity.logo_url && (
               <div className="entity-logo-wrapper">
-                <img src={currentEntity.logo} alt={`${currentEntity.entityName} logo`} className="entity-logo" />
+                <img src={currentEntity.logo_url} alt={`${currentEntity.entity_name} logo`} className="entity-logo" />
               </div>
             )}
-            <h1 className="entity-name">{currentEntity.entityName}</h1>
+            <h1 className="entity-name">{currentEntity.entity_name}</h1>
           </div>
           {currentEntity.description && (
             <p className="entity-description">{currentEntity.description}</p>
@@ -210,8 +232,8 @@ function EntityView({ entity, onBack, onEdit, onDelete, currentUser }) {
                 if (!platformData) return null;
 
                 const Icon = platformData.icon;
-                const url = currentEntity.socialMedia[platform];
-                const clickCount = currentEntity.socialClicks?.[platform] || 0;
+                const url = currentEntity.social_media[platform];
+                const clickCount = currentEntity.social_clicks?.[platform] || 0;
 
                 return (
                   <a
@@ -264,7 +286,7 @@ function EntityView({ entity, onBack, onEdit, onDelete, currentUser }) {
               <div className="qr-code-right-section">
                 <div className="qr-scan-count">
                   <span className="scan-count-label">QR Scans: </span>
-                  <span className="scan-count-value">{currentEntity.qrScans || 0}</span>
+                      <span className="scan-count-value">{currentEntity.qr_scans || 0}</span>
                 </div>
                 <button
                   onClick={handleDownloadQR}

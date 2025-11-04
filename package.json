@@ -3,36 +3,25 @@
   "version": "1.0.0",
   "description": "Speak your heart online - Connect with your audience through social media",
   "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
+    "next": "^14.2.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "react-icons": "^4.11.0",
-    "react-scripts": "5.0.1",
     "qrcode.react": "^3.1.0",
     "leaflet": "^1.9.4",
-    "react-leaflet": "^4.2.1"
+    "react-leaflet": "^4.2.1",
+    "@supabase/supabase-js": "^2.39.0",
+    "@supabase/ssr": "^0.1.0"
   },
-  "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
-  },
-  "eslintConfig": {
-    "extends": [
-      "react-app"
-    ]
-  },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "eslint-config-next": "^14.2.0"
   }
 }

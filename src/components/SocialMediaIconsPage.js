@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import './SocialMediaIconsPage.css';
-import { getEntityByUUID, trackQRScan, trackSocialClick } from '../utils/storage';
+import { createClient } from '@/lib/supabase/client';
 import {
   FaFacebook,
   FaTwitter,
@@ -48,42 +48,84 @@ function SocialMediaIconsPage({ uuid }) {
   const [entity, setEntity] = useState(null);
   const [loading, setLoading] = useState(true);
   const hasTracked = useRef(false);
+  const supabase = createClient();
 
   useEffect(() => {
     if (uuid && !hasTracked.current) {
-      // Load entity by UUID
-      const foundEntity = getEntityByUUID(uuid);
-      
-      if (foundEntity) {
-        setEntity(foundEntity);
+      loadEntity();
+    } else if (!uuid) {
+      setLoading(false);
+    }
+  }, [uuid]);
+
+  const loadEntity = async () => {
+    if (!uuid) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      // Get profile by UUID
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('uuid', uuid)
+        .single();
+
+      if (error) {
+        console.error('Error loading entity:', error);
+        setLoading(false);
+        return;
+      }
+
+      if (data) {
+        setEntity(data);
         
-        // Track QR code scan only once per page load
-        // Use sessionStorage to prevent duplicate tracking in same session
+        // Track QR scan (once per session)
         const scanKey = `qr_scanned_${uuid}`;
         const alreadyScanned = sessionStorage.getItem(scanKey);
         
-        if (!alreadyScanned) {
-          trackQRScan(uuid);
-          sessionStorage.setItem(scanKey, 'true');
+        if (!alreadyScanned && data.active) {
+          // Call Supabase function to track scan
+          const { error: trackError } = await supabase.rpc('track_qr_scan', {
+            profile_uuid: uuid
+          });
+          
+          if (!trackError) {
+            sessionStorage.setItem(scanKey, 'true');
+            // Reload entity to get updated scan count
+            loadEntity();
+          }
           hasTracked.current = true;
         } else {
           hasTracked.current = true;
         }
       }
       setLoading(false);
-    } else if (!uuid) {
+    } catch (error) {
+      console.error('Error:', error);
       setLoading(false);
     }
-  }, [uuid]);
+  };
 
-  const handleSocialClick = (platform, url, entityId) => {
-    // Track the click
-    trackSocialClick(entityId, platform);
-    // Reload entity data to reflect updated click count
-    const updatedEntity = getEntityByUUID(uuid);
-    if (updatedEntity) {
-      setEntity(updatedEntity);
+  const handleSocialClick = async (platform, url, entityId) => {
+    if (!uuid || !entity?.active) return;
+
+    try {
+      // Track the click using Supabase function
+      const { error } = await supabase.rpc('track_social_click', {
+        profile_uuid: uuid,
+        platform: platform
+      });
+
+      if (!error) {
+        // Reload entity data to reflect updated click count
+        await loadEntity();
+      }
+    } catch (error) {
+      console.error('Error tracking click:', error);
     }
+
     // Open in new tab
     window.open(url, '_blank', 'noopener,noreferrer');
   };
@@ -102,15 +144,15 @@ function SocialMediaIconsPage({ uuid }) {
   if (!entity) {
     return (
       <div className="social-icons-page">
-            <div className="error-container">
-              <h1>Profile Not Found</h1>
-              <p>The QR code is invalid or the profile has been removed.</p>
-            </div>
+        <div className="error-container">
+          <h1>Profile Not Found</h1>
+          <p>The QR code is invalid or the profile has been removed.</p>
+        </div>
       </div>
     );
   }
 
-  const socialMediaLinks = Object.keys(entity.socialMedia || {});
+  const socialMediaLinks = Object.keys(entity.social_media || {});
 
   if (socialMediaLinks.length === 0) {
     return (
@@ -126,12 +168,12 @@ function SocialMediaIconsPage({ uuid }) {
     <div className="social-icons-page">
       <div className="social-icons-container">
         <div className="company-header">
-          {entity.logo && (
+          {entity.logo_url && (
             <div className="company-logo-wrapper">
-              <img src={entity.logo} alt={`${entity.entityName} logo`} className="company-logo" />
+              <img src={entity.logo_url} alt={`${entity.entity_name} logo`} className="company-logo" />
             </div>
           )}
-          <h1 className="company-name">{entity.entityName}</h1>
+          <h1 className="company-name">{entity.entity_name}</h1>
         </div>
         <div className="social-icons-grid">
           {socialMediaLinks.map((platform) => {
@@ -139,7 +181,7 @@ function SocialMediaIconsPage({ uuid }) {
             if (!platformData) return null;
 
             const Icon = platformData.icon;
-            const url = entity.socialMedia[platform];
+            const url = entity.social_media[platform];
 
             return (
               <button
