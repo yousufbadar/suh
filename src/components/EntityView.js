@@ -245,6 +245,42 @@ function EntityView({ entity, onBack, onEdit, onDelete }) {
           </div>
         )}
 
+        {currentEntity.customLinks && currentEntity.customLinks.length > 0 && (
+          <div className="social-media-section-top">
+            <h2 className="section-title">Custom Links</h2>
+            <div className="social-links-grid">
+              {currentEntity.customLinks.map((customLink, index) => (
+                <a
+                  key={index}
+                  href={customLink.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="social-link-item custom-link-item-view"
+                  style={{ borderLeftColor: '#667eea' }}
+                >
+                  <div
+                    className="social-link-icon custom-link-icon"
+                    style={{ backgroundColor: '#667eea15' }}
+                  >
+                    {customLink.icon && (
+                      <img 
+                        src={customLink.icon} 
+                        alt={`${customLink.name} icon`}
+                        className="custom-link-icon-image"
+                      />
+                    )}
+                  </div>
+                  <div className="social-link-content">
+                    <span className="social-link-name">
+                      {customLink.name}
+                    </span>
+                  </div>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="entity-header-with-qr">
           <div className="entity-header-with-qr-top">
             <div className="qr-code-container">

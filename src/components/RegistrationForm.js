@@ -82,6 +82,11 @@ function RegistrationForm({ entity, onSave, onCancel }) {
         country: entity.country || '',
         socialMedia: socialMedia,
         logo: entity.logo || null,
+        customLinks: entity.customLinks || [
+          { name: '', icon: null, link: '' },
+          { name: '', icon: null, link: '' },
+          { name: '', icon: null, link: '' },
+        ],
       };
     }
     return {
@@ -95,6 +100,11 @@ function RegistrationForm({ entity, onSave, onCancel }) {
       country: '',
       socialMedia: getInitialSocialMedia(),
       logo: null,
+      customLinks: [
+        { name: '', icon: null, link: '' },
+        { name: '', icon: null, link: '' },
+        { name: '', icon: null, link: '' },
+      ],
     };
   }, [entity]);
 
@@ -111,6 +121,96 @@ function RegistrationForm({ entity, onSave, onCancel }) {
     setInitialData(JSON.stringify(initialFormData));
     setLogoPreview(entity?.logo || null);
   }, [initialFormData, entity]);
+
+  const handleCustomLinkChange = (index, field, value) => {
+    setFormData((prev) => {
+      const updatedLinks = [...prev.customLinks];
+      updatedLinks[index] = {
+        ...updatedLinks[index],
+        [field]: value,
+      };
+      return {
+        ...prev,
+        customLinks: updatedLinks,
+      };
+    });
+    // Clear error for this field
+    if (errors[`customLink_${index}_${field}`]) {
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[`customLink_${index}_${field}`];
+        return newErrors;
+      });
+    }
+  };
+
+  const handleCustomLinkIconChange = (index, e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validate file type using security utility
+      if (!validateFileType(file)) {
+        setErrors((prev) => ({
+          ...prev,
+          [`customLink_${index}_icon`]: 'Please select a valid image file (JPEG, PNG, GIF, or WebP)',
+        }));
+        return;
+      }
+
+      // Validate file size using security utility (max 1MB for icons)
+      if (!validateFileSize(file, 1)) {
+        setErrors((prev) => ({
+          ...prev,
+          [`customLink_${index}_icon`]: 'Image size must be less than 1MB',
+        }));
+        return;
+      }
+
+      // Additional security: Check file extension matches MIME type
+      const validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+      const fileName = file.name.toLowerCase();
+      const hasValidExtension = validExtensions.some(ext => fileName.endsWith(ext));
+      
+      if (!hasValidExtension) {
+        setErrors((prev) => ({
+          ...prev,
+          [`customLink_${index}_icon`]: 'File extension does not match file type',
+        }));
+        return;
+      }
+
+      // Read file as data URL
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const iconDataUrl = reader.result;
+        
+        // Additional validation: Ensure data URL is valid image
+        if (!iconDataUrl.startsWith('data:image/')) {
+          setErrors((prev) => ({
+            ...prev,
+            [`customLink_${index}_icon`]: 'Invalid image file',
+          }));
+          return;
+        }
+        
+        handleCustomLinkChange(index, 'icon', iconDataUrl);
+        setErrors((prev) => ({
+          ...prev,
+          [`customLink_${index}_icon`]: '',
+        }));
+      };
+      reader.onerror = () => {
+        setErrors((prev) => ({
+          ...prev,
+          [`customLink_${index}_icon`]: 'Error reading file',
+        }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveCustomLinkIcon = (index) => {
+    handleCustomLinkChange(index, 'icon', null);
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -340,6 +440,43 @@ function RegistrationForm({ entity, onSave, onCancel }) {
       }
     });
 
+    // Validate custom links (optional - only validate if user starts filling them)
+    formData.customLinks.forEach((customLink, index) => {
+      // If any field is filled, validate the filled fields
+      const hasAnyField = customLink.name || customLink.icon || customLink.link;
+      if (hasAnyField) {
+        // Name validation (only if filled)
+        if (customLink.name && customLink.name.trim()) {
+          if (!validateLength(customLink.name, 1, 100)) {
+            newErrors[`customLink_${index}_name`] = 'Name must be between 1 and 100 characters';
+          }
+        }
+        
+        // Link validation (only if filled)
+        if (customLink.link && customLink.link.trim()) {
+          const sanitizedUrl = sanitizeUrl(customLink.link);
+          if (!sanitizedUrl) {
+            newErrors[`customLink_${index}_link`] = 'Please enter a valid URL (HTTP or HTTPS only)';
+          } else if (!validateLength(customLink.link, 0, 500)) {
+            newErrors[`customLink_${index}_link`] = 'URL must be less than 500 characters';
+          }
+        }
+        
+        // If user fills name or link, they should fill all fields for that link
+        if ((customLink.name && customLink.name.trim()) || (customLink.link && customLink.link.trim())) {
+          if (!customLink.name || !customLink.name.trim()) {
+            newErrors[`customLink_${index}_name`] = 'Name is required if you fill other fields';
+          }
+          if (!customLink.icon) {
+            newErrors[`customLink_${index}_icon`] = 'Icon image is required if you fill other fields';
+          }
+          if (!customLink.link || !customLink.link.trim()) {
+            newErrors[`customLink_${index}_link`] = 'Link is required if you fill other fields';
+          }
+        }
+      }
+    });
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -387,10 +524,16 @@ function RegistrationForm({ entity, onSave, onCancel }) {
         }
       });
 
+      // Filter out empty custom links
+      const customLinksToSave = (sanitizedFormData.customLinks || []).filter(
+        (link) => link.name && link.name.trim() && link.icon && link.link && link.link.trim()
+      );
+
       const dataToSave = {
         ...sanitizedFormData,
         id: entity?.id, // Preserve ID if editing
         socialMedia: socialMediaToSave,
+        customLinks: customLinksToSave,
       };
 
       try {
@@ -629,6 +772,96 @@ function RegistrationForm({ entity, onSave, onCancel }) {
               </div>
             );
           })}
+        </div>
+      </div>
+
+      <div className="form-section">
+        <h2 className="section-title">Custom Links (Optional)</h2>
+        <p className="section-description">
+          Add up to 3 optional custom links with your own name, icon image, and URL. Leave empty if not needed.
+        </p>
+        <div className="custom-links-container">
+          {formData.customLinks.map((customLink, index) => (
+            <div key={index} className="custom-link-item">
+              <div className="custom-link-number">Link {index + 1}</div>
+              <div className="custom-link-fields">
+                <div className="form-group">
+                  <label htmlFor={`customLink_${index}_name`}>
+                    Name
+                  </label>
+                  <input
+                    type="text"
+                    id={`customLink_${index}_name`}
+                    value={customLink.name}
+                    onChange={(e) => handleCustomLinkChange(index, 'name', e.target.value)}
+                    className={errors[`customLink_${index}_name`] ? 'error' : ''}
+                    placeholder="e.g., My Portfolio"
+                    maxLength={100}
+                  />
+                  {errors[`customLink_${index}_name`] && (
+                    <span className="error-message">{errors[`customLink_${index}_name`]}</span>
+                  )}
+                </div>
+                <div className="form-group">
+                  <label htmlFor={`customLink_${index}_icon`}>
+                    Icon Image
+                  </label>
+                  <div className="icon-upload-container">
+                    {customLink.icon ? (
+                      <div className="icon-preview-wrapper">
+                        <img 
+                          src={customLink.icon} 
+                          alt={`Custom link ${index + 1} icon`}
+                          className="icon-preview"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveCustomLinkIcon(index)}
+                          className="remove-icon-button"
+                          title="Remove icon"
+                        >
+                          <FaTimes />
+                        </button>
+                      </div>
+                    ) : (
+                      <label htmlFor={`customLink_${index}_icon`} className="icon-upload-label">
+                        <FaImage className="upload-icon" />
+                        <span>Upload Icon</span>
+                        <input
+                          type="file"
+                          id={`customLink_${index}_icon`}
+                          accept="image/jpeg,image/png,image/gif,image/webp"
+                          onChange={(e) => handleCustomLinkIconChange(index, e)}
+                          className="icon-upload-input"
+                          style={{ display: 'none' }}
+                        />
+                      </label>
+                    )}
+                    {errors[`customLink_${index}_icon`] && (
+                      <span className="error-message">{errors[`customLink_${index}_icon`]}</span>
+                    )}
+                  </div>
+                </div>
+                <div className="form-group full-width">
+                  <label htmlFor={`customLink_${index}_link`}>
+                    Link URL
+                  </label>
+                  <input
+                    type="url"
+                    id={`customLink_${index}_link`}
+                    value={customLink.link}
+                    onChange={(e) => handleCustomLinkChange(index, 'link', e.target.value)}
+                    className={errors[`customLink_${index}_link`] ? 'error' : ''}
+                    placeholder="https://example.com"
+                    maxLength={500}
+                  />
+                  {errors[`customLink_${index}_link`] && (
+                    <span className="error-message">{errors[`customLink_${index}_link`]}</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 

@@ -231,7 +231,8 @@ export const sanitizeFormData = (formData) => {
     city: formData.city ? sanitizeText(formData.city).trim() : '',
     country: formData.country ? sanitizeText(formData.country).trim() : '',
     socialMedia: {},
-    logo: formData.logo || null
+    logo: formData.logo || null,
+    customLinks: formData.customLinks || []
   };
   
   // Sanitize social media URLs
@@ -245,6 +246,15 @@ export const sanitizeFormData = (formData) => {
         }
       }
     });
+  }
+  
+  // Sanitize custom links
+  if (formData.customLinks && Array.isArray(formData.customLinks)) {
+    sanitized.customLinks = formData.customLinks.map((link) => ({
+      name: link.name ? sanitizeText(link.name).trim() : '',
+      icon: link.icon || null, // Keep icon as-is (data URL or null)
+      link: link.link ? sanitizeUrl(link.link) : ''
+    }));
   }
   
   return sanitized;
