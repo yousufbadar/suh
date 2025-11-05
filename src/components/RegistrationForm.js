@@ -513,7 +513,7 @@ function RegistrationForm({ entity, onSave, onCancel }) {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     // Prevent double submission
@@ -569,8 +569,8 @@ function RegistrationForm({ entity, onSave, onCancel }) {
       };
 
       try {
-        // Save to localStorage (no authentication required)
-        const savedEntity = saveEntity(dataToSave);
+        // Save to Supabase database (no authentication required)
+        const savedEntity = await saveEntity(dataToSave);
 
         console.log('Form submitted:', savedEntity);
         setSubmitted(true);

@@ -63,42 +63,45 @@ function SocialMediaIconsPage({ uuid }) {
   };
 
   useEffect(() => {
-    if (uuid && !hasTracked.current) {
-      // Load entity by UUID
-      const foundEntity = getEntityByUUID(uuid);
+    const loadEntity = async () => {
+      if (uuid && !hasTracked.current) {
+        // Load entity by UUID
+        const foundEntity = await getEntityByUUID(uuid);
       
-      if (foundEntity) {
-        setEntity(foundEntity);
-        
-        // Track QR code scan only once per page load
-        // Use sessionStorage to prevent duplicate tracking in same session
-        const scanKey = `qr_scanned_${uuid}`;
-        const alreadyScanned = sessionStorage.getItem(scanKey);
-        
-        if (!alreadyScanned) {
-          trackQRScan(uuid);
-          sessionStorage.setItem(scanKey, 'true');
-          hasTracked.current = true;
-        } else {
-          hasTracked.current = true;
+        if (foundEntity) {
+          setEntity(foundEntity);
+          
+          // Track QR code scan only once per page load
+          // Use sessionStorage to prevent duplicate tracking in same session
+          const scanKey = `qr_scanned_${uuid}`;
+          const alreadyScanned = sessionStorage.getItem(scanKey);
+          
+          if (!alreadyScanned) {
+            await trackQRScan(uuid);
+            sessionStorage.setItem(scanKey, 'true');
+            hasTracked.current = true;
+          } else {
+            hasTracked.current = true;
+          }
         }
+        setLoading(false);
+      } else if (!uuid) {
+        setLoading(false);
       }
-      setLoading(false);
-    } else if (!uuid) {
-      setLoading(false);
-    }
+    };
+    loadEntity();
   }, [uuid]);
 
-  const handleSocialClick = (platform, url, entityId) => {
+  const handleSocialClick = async (platform, url, entityId) => {
     if (!entity?.uuid || !entity?.active) {
       window.open(url, '_blank', 'noopener,noreferrer');
       return;
     }
 
     // Track the click
-    trackSocialClick(entityId, platform);
+    await trackSocialClick(entityId, platform);
     // Reload entity data to reflect updated click count
-    const updatedEntity = getEntityByUUID(uuid);
+    const updatedEntity = await getEntityByUUID(uuid);
     if (updatedEntity) {
       setEntity(updatedEntity);
     }
@@ -106,16 +109,16 @@ function SocialMediaIconsPage({ uuid }) {
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
-  const handleCustomLinkClick = (customLinkIndex, url, entityId) => {
+  const handleCustomLinkClick = async (customLinkIndex, url, entityId) => {
     if (!entity?.uuid || !entity?.active) {
       window.open(url, '_blank', 'noopener,noreferrer');
       return;
     }
 
     // Track the click
-    trackCustomLinkClick(entityId, customLinkIndex);
+    await trackCustomLinkClick(entityId, customLinkIndex);
     // Reload entity data to reflect updated click count
-    const updatedEntity = getEntityByUUID(uuid);
+    const updatedEntity = await getEntityByUUID(uuid);
     if (updatedEntity) {
       setEntity(updatedEntity);
     }

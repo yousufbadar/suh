@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import './EntityView.css';
 import { QRCodeSVG } from 'qrcode.react';
 import LocationMap from './LocationMap';
-import { getEntityById, trackSocialClick, trackCustomLinkClick } from '../utils/storage';
+import { getEntityWithAnalytics, trackSocialClick, trackCustomLinkClick } from '../utils/storage';
 import {
   FaFacebook,
   FaTwitter,
@@ -64,9 +64,23 @@ function EntityView({ entity, onBack, onEdit, onDelete, onViewDashboard }) {
   const [copied, setCopied] = useState(false);
   const [currentEntity, setCurrentEntity] = useState(entity);
 
-  // Update current entity when prop changes
+  // Update current entity when prop changes, and load analytics if needed
   useEffect(() => {
-    setCurrentEntity(entity);
+    const loadEntityWithAnalytics = async () => {
+      if (entity && entity.id) {
+        // Load entity with analytics to get click counts
+        const entityWithAnalytics = await getEntityWithAnalytics(entity.id);
+        if (entityWithAnalytics) {
+          setCurrentEntity(entityWithAnalytics);
+        } else {
+          // Fallback to entity without analytics if loading fails
+          setCurrentEntity(entity);
+        }
+      } else {
+        setCurrentEntity(entity);
+      }
+    };
+    loadEntityWithAnalytics();
   }, [entity]);
 
   // Generate QR code with URL containing UUID
@@ -144,7 +158,7 @@ function EntityView({ entity, onBack, onEdit, onDelete, onViewDashboard }) {
     img.src = url;
   };
 
-  const handleSocialClick = (platform, url, entityId, e) => {
+  const handleSocialClick = async (platform, url, entityId, e) => {
     e.preventDefault();
     if (!currentEntity?.uuid || !currentEntity?.active) {
       window.open(url, '_blank', 'noopener,noreferrer');
@@ -152,9 +166,9 @@ function EntityView({ entity, onBack, onEdit, onDelete, onViewDashboard }) {
     }
 
     // Track the click
-    trackSocialClick(entityId, platform);
-    // Reload entity data to reflect updated click count
-    const updatedEntity = getEntityById(entityId);
+    await trackSocialClick(entityId, platform);
+    // Reload entity data with analytics to reflect updated click count
+    const updatedEntity = await getEntityWithAnalytics(entityId);
     if (updatedEntity) {
       setCurrentEntity(updatedEntity);
     }
@@ -162,7 +176,7 @@ function EntityView({ entity, onBack, onEdit, onDelete, onViewDashboard }) {
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
-  const handleCustomLinkClick = (customLinkIndex, url, entityId, e) => {
+  const handleCustomLinkClick = async (customLinkIndex, url, entityId, e) => {
     e.preventDefault();
     if (!currentEntity?.uuid || !currentEntity?.active) {
       window.open(url, '_blank', 'noopener,noreferrer');
@@ -170,9 +184,9 @@ function EntityView({ entity, onBack, onEdit, onDelete, onViewDashboard }) {
     }
 
     // Track the click
-    trackCustomLinkClick(entityId, customLinkIndex);
-    // Reload entity data to reflect updated click count
-    const updatedEntity = getEntityById(entityId);
+    await trackCustomLinkClick(entityId, customLinkIndex);
+    // Reload entity data with analytics to reflect updated click count
+    const updatedEntity = await getEntityWithAnalytics(entityId);
     if (updatedEntity) {
       setCurrentEntity(updatedEntity);
     }

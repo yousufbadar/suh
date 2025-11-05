@@ -17,6 +17,8 @@ function Home({ onGetStarted }) {
     applyTheme(themeId);
   };
 
+  console.log('Home component rendering, onGetStarted:', typeof onGetStarted);
+
   return (
     <div className="home-page">
       <ThemeSelector currentTheme={currentTheme} onThemeChange={handleThemeChange} />

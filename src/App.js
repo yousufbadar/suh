@@ -24,27 +24,41 @@ function App() {
   useEffect(() => {
     // Apply theme on mount
     applyTheme(currentTheme);
-    
-    // Load all entities (no authentication required)
-    loadEntities();
-    
-    // Check URL for UUID parameter
-    const urlParams = new URLSearchParams(window.location.search);
-    const uuidParam = urlParams.get('uuid');
-    if (uuidParam) {
-      setUuid(uuidParam);
-      setCurrentPage('icons');
-      return; // Don't show home page if UUID is in URL
-    }
-    // Default to home page if no UUID
-    if (currentPage === 'home') {
-      return;
-    }
   }, [currentTheme]);
 
-  const loadEntities = () => {
-    const loadedEntities = getEntities(); // Get all entities
-    setEntities(loadedEntities);
+  useEffect(() => {
+    // Check URL for UUID parameter first
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const uuidParam = urlParams.get('uuid');
+      if (uuidParam) {
+        setUuid(uuidParam);
+        setCurrentPage('icons');
+        return; // Don't show home page if UUID is in URL
+      }
+    } catch (error) {
+      console.error('Error checking URL params:', error);
+    }
+    
+    // Load all entities (no authentication required) - don't block rendering
+    // Use setTimeout to ensure this doesn't block initial render
+    setTimeout(() => {
+      loadEntities().catch(error => {
+        console.error('Error loading entities:', error);
+        // Don't prevent app from rendering if entities fail to load
+        setEntities([]); // Set empty array on error
+      });
+    }, 0);
+  }, []); // Run only once on mount
+
+  const loadEntities = async () => {
+    try {
+      const loadedEntities = await getEntities(); // Get all entities
+      setEntities(loadedEntities);
+    } catch (error) {
+      console.error('Error loading entities:', error);
+      setEntities([]);
+    }
   };
 
 
@@ -71,13 +85,17 @@ function App() {
     setShowConfirmDialog(true);
   };
 
-  const confirmDeactivate = () => {
+  const confirmDeactivate = async () => {
     if (entityToDelete) {
-      deactivateEntity(entityToDelete.id);
-      loadEntities();
-      if (selectedEntity?.id === entityToDelete.id) {
-        setSelectedEntity(null);
-        setCurrentPage('list');
+      try {
+        await deactivateEntity(entityToDelete.id);
+        await loadEntities();
+        if (selectedEntity?.id === entityToDelete.id) {
+          setSelectedEntity(null);
+          setCurrentPage('list');
+        }
+      } catch (error) {
+        console.error('Error deactivating entity:', error);
       }
     }
     setShowConfirmDialog(false);
@@ -89,9 +107,13 @@ function App() {
     setEntityToDelete(null);
   };
 
-  const handleReactivateEntity = (id) => {
-    reactivateEntity(id);
-    loadEntities();
+  const handleReactivateEntity = async (id) => {
+    try {
+      await reactivateEntity(id);
+      await loadEntities();
+    } catch (error) {
+      console.error('Error reactivating entity:', error);
+    }
   };
 
   const handleRegisterNew = () => {
@@ -128,6 +150,7 @@ function App() {
 
   // Render home page
   if (currentPage === 'home') {
+    console.log('Rendering home page');
     return <Home onGetStarted={handleGetStarted} />;
   }
 

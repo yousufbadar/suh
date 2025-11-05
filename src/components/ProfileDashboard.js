@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './ProfileDashboard.css';
-import { getEntityById } from '../utils/storage';
+import { getEntityWithAnalytics } from '../utils/storage';
 import {
   getSummaryStats,
   getClicksByDay,
@@ -31,38 +31,49 @@ function ProfileDashboard({ entityId, onBack }) {
   const [dayOffset, setDayOffset] = useState(0); // 0 = today, 7 = last week, etc.
 
   useEffect(() => {
-    if (entityId) {
-      const loadedEntity = getEntityById(entityId);
-      if (loadedEntity) {
-        setEntity(loadedEntity);
-        setSummaryStats(getSummaryStats(loadedEntity));
-        const daily = getClicksByDay(loadedEntity, 7, dayOffset);
-        const weekly = getClicksByWeek(loadedEntity, 8);
-        const monthly = getClicksByMonth(loadedEntity, 12);
-        const yearly = getClicksByYear(loadedEntity);
-        setDailyData(daily);
-        setWeeklyData(weekly);
-        setMonthlyData(monthly);
-        setYearlyData(yearly);
+    const loadEntityData = async () => {
+      if (entityId) {
+        try {
+          const loadedEntity = await getEntityWithAnalytics(entityId);
+          if (loadedEntity) {
+            setEntity(loadedEntity);
+            setSummaryStats(getSummaryStats(loadedEntity));
+            const daily = getClicksByDay(loadedEntity, 7, dayOffset);
+            const weekly = getClicksByWeek(loadedEntity, 8);
+            const monthly = getClicksByMonth(loadedEntity, 12);
+            const yearly = getClicksByYear(loadedEntity);
+            setDailyData(daily);
+            setWeeklyData(weekly);
+            setMonthlyData(monthly);
+            setYearlyData(yearly);
+          }
+        } catch (error) {
+          console.error('Error loading entity data:', error);
+        }
       }
-    }
+    };
+    loadEntityData();
   }, [entityId, dayOffset]);
 
   // Refresh data periodically
   useEffect(() => {
-    const interval = setInterval(() => {
+    const interval = setInterval(async () => {
       if (entityId) {
-        const loadedEntity = getEntityById(entityId);
-        if (loadedEntity) {
-          setEntity(loadedEntity);
-          setSummaryStats(getSummaryStats(loadedEntity));
-          setDailyData(getClicksByDay(loadedEntity, 7, dayOffset));
-          setWeeklyData(getClicksByWeek(loadedEntity, 8));
-          setMonthlyData(getClicksByMonth(loadedEntity, 12));
-          setYearlyData(getClicksByYear(loadedEntity));
+        try {
+          const loadedEntity = await getEntityWithAnalytics(entityId);
+          if (loadedEntity) {
+            setEntity(loadedEntity);
+            setSummaryStats(getSummaryStats(loadedEntity));
+            setDailyData(getClicksByDay(loadedEntity, 7, dayOffset));
+            setWeeklyData(getClicksByWeek(loadedEntity, 8));
+            setMonthlyData(getClicksByMonth(loadedEntity, 12));
+            setYearlyData(getClicksByYear(loadedEntity));
+          }
+        } catch (error) {
+          console.error('Error refreshing entity data:', error);
         }
       }
-    }, 5000); // Refresh every 5 seconds
+    }, 30000); // Refresh every 30 seconds
 
     return () => clearInterval(interval);
   }, [entityId]);
@@ -226,14 +237,18 @@ function ProfileDashboard({ entityId, onBack }) {
         <div className="period-selector">
           <button
             className={`period-button ${selectedPeriod === 'day' ? 'active' : ''}`}
-            onClick={() => {
+            onClick={async () => {
               setSelectedPeriod('day');
               setDayOffset(0);
               // Force refresh data
               if (entityId) {
-                const loadedEntity = getEntityById(entityId);
-                if (loadedEntity) {
-                  setDailyData(getClicksByDay(loadedEntity, 7, 0));
+                try {
+                  const loadedEntity = await getEntityWithAnalytics(entityId);
+                  if (loadedEntity) {
+                    setDailyData(getClicksByDay(loadedEntity, 7, 0));
+                  }
+                } catch (error) {
+                  console.error('Error loading entity data:', error);
                 }
               }
             }}
@@ -242,13 +257,17 @@ function ProfileDashboard({ entityId, onBack }) {
           </button>
           <button
             className={`period-button ${selectedPeriod === 'week' ? 'active' : ''}`}
-            onClick={() => {
+            onClick={async () => {
               setSelectedPeriod('week');
               // Force refresh data
               if (entityId) {
-                const loadedEntity = getEntityById(entityId);
-                if (loadedEntity) {
-                  setWeeklyData(getClicksByWeek(loadedEntity, 8));
+                try {
+                  const loadedEntity = await getEntityWithAnalytics(entityId);
+                  if (loadedEntity) {
+                    setWeeklyData(getClicksByWeek(loadedEntity, 8));
+                  }
+                } catch (error) {
+                  console.error('Error loading entity data:', error);
                 }
               }
             }}
