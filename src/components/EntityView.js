@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import './EntityView.css';
 import { QRCodeSVG } from 'qrcode.react';
 import LocationMap from './LocationMap';
-import { getEntityById, trackSocialClick } from '../utils/storage';
+import { getEntityById, trackSocialClick, trackCustomLinkClick } from '../utils/storage';
 import {
   FaFacebook,
   FaTwitter,
@@ -26,6 +26,7 @@ import {
   FaGlobe,
   FaPhone,
   FaMapMarkerAlt,
+  FaUser,
   FaEdit,
   FaTrash,
   FaArrowLeft,
@@ -35,6 +36,7 @@ import {
   FaQrcode,
   FaEye,
   FaHeart,
+  FaChartBar,
 } from 'react-icons/fa';
 
 const socialMediaPlatforms = {
@@ -58,7 +60,7 @@ const socialMediaPlatforms = {
   flickr: { name: 'Flickr', icon: FaFlickr, color: '#ff0084' },
 };
 
-function EntityView({ entity, onBack, onEdit, onDelete }) {
+function EntityView({ entity, onBack, onEdit, onDelete, onViewDashboard }) {
   const [copied, setCopied] = useState(false);
   const [currentEntity, setCurrentEntity] = useState(entity);
 
@@ -144,8 +146,31 @@ function EntityView({ entity, onBack, onEdit, onDelete }) {
 
   const handleSocialClick = (platform, url, entityId, e) => {
     e.preventDefault();
+    if (!currentEntity?.uuid || !currentEntity?.active) {
+      window.open(url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
     // Track the click
     trackSocialClick(entityId, platform);
+    // Reload entity data to reflect updated click count
+    const updatedEntity = getEntityById(entityId);
+    if (updatedEntity) {
+      setCurrentEntity(updatedEntity);
+    }
+    // Open in new tab
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleCustomLinkClick = (customLinkIndex, url, entityId, e) => {
+    e.preventDefault();
+    if (!currentEntity?.uuid || !currentEntity?.active) {
+      window.open(url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    // Track the click
+    trackCustomLinkClick(entityId, customLinkIndex);
     // Reload entity data to reflect updated click count
     const updatedEntity = getEntityById(entityId);
     if (updatedEntity) {
@@ -175,6 +200,9 @@ function EntityView({ entity, onBack, onEdit, onDelete }) {
               <FaArrowLeft /> Back to Profiles
             </button>
                 <div className="entity-actions">
+                  <button onClick={() => onViewDashboard(currentEntity)} className="dashboard-button">
+                    <FaChartBar /> Dashboard
+                  </button>
                   <button onClick={() => onEdit(currentEntity)} className="edit-button">
                     <FaEdit /> Edit
                   </button>
@@ -249,34 +277,41 @@ function EntityView({ entity, onBack, onEdit, onDelete }) {
           <div className="social-media-section-top">
             <h2 className="section-title">Custom Links</h2>
             <div className="social-links-grid">
-              {currentEntity.customLinks.map((customLink, index) => (
-                <a
-                  key={index}
-                  href={customLink.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="social-link-item custom-link-item-view"
-                  style={{ borderLeftColor: '#667eea' }}
-                >
-                  <div
-                    className="social-link-icon custom-link-icon"
-                    style={{ backgroundColor: '#667eea15' }}
+              {currentEntity.customLinks.map((customLink, index) => {
+                const clickCount = currentEntity.customLinkClicks?.[index] || 0;
+                return (
+                  <a
+                    key={index}
+                    href={customLink.link}
+                    onClick={(e) => handleCustomLinkClick(index, customLink.link, currentEntity.id, e)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="social-link-item custom-link-item-view"
+                    style={{ borderLeftColor: '#32cd32' }}
                   >
-                    {customLink.icon && (
-                      <img 
-                        src={customLink.icon} 
-                        alt={`${customLink.name} icon`}
-                        className="custom-link-icon-image"
-                      />
-                    )}
-                  </div>
-                  <div className="social-link-content">
-                    <span className="social-link-name">
-                      {customLink.name}
-                    </span>
-                  </div>
-                </a>
-              ))}
+                    <div
+                      className="social-link-icon custom-link-icon"
+                      style={{ backgroundColor: '#32cd3215' }}
+                    >
+                      {customLink.icon && (
+                        <img 
+                          src={customLink.icon} 
+                          alt={`${customLink.name} icon`}
+                          className="custom-link-icon-image"
+                        />
+                      )}
+                    </div>
+                    <div className="social-link-content">
+                      <span className="social-link-name">
+                        {customLink.name}
+                      </span>
+                      <span className="social-link-clicks">
+                        {clickCount} {clickCount === 1 ? 'click' : 'clicks'}
+                      </span>
+                    </div>
+                  </a>
+                );
+              })}
             </div>
           </div>
         )}
@@ -378,6 +413,49 @@ function EntityView({ entity, onBack, onEdit, onDelete }) {
               )}
             </div>
           </div>
+
+          {(currentEntity.contactPersonName || currentEntity.contactPersonEmail || currentEntity.contactPersonPhone) && (
+            <div className="detail-section">
+              <h2 className="section-title">Contact Person</h2>
+              <div className="detail-grid">
+                {currentEntity.contactPersonName && (
+                  <div className="detail-item">
+                    <FaUser className="detail-icon" />
+                    <div className="detail-content">
+                      <span className="detail-label">Contact Person</span>
+                      <span className="detail-value">
+                        {currentEntity.contactPersonName}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {currentEntity.contactPersonEmail && (
+                  <div className="detail-item">
+                    <FaEnvelope className="detail-icon" />
+                    <div className="detail-content">
+                      <span className="detail-label">Contact Email</span>
+                      <a href={`mailto:${currentEntity.contactPersonEmail}`} className="detail-value">
+                        {currentEntity.contactPersonEmail}
+                      </a>
+                    </div>
+                  </div>
+                )}
+
+                {currentEntity.contactPersonPhone && (
+                  <div className="detail-item">
+                    <FaPhone className="detail-icon" />
+                    <div className="detail-content">
+                      <span className="detail-label">Contact Phone</span>
+                      <a href={`tel:${currentEntity.contactPersonPhone}`} className="detail-value">
+                        {currentEntity.contactPersonPhone}
+                      </a>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {(currentEntity.address || currentEntity.city || currentEntity.country) && (
             <div className="detail-section">

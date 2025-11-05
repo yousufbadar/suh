@@ -131,10 +131,13 @@ export const trackQRScan = (uuid) => {
   const entityIndex = entities.findIndex((e) => e.uuid === uuid);
 
   if (entityIndex >= 0) {
+    const timestamp = new Date().toISOString();
+    const qrScanTimestamps = entities[entityIndex].qrScanTimestamps || [];
     entities[entityIndex] = {
       ...entities[entityIndex],
       qrScans: (entities[entityIndex].qrScans || 0) + 1,
-      lastScannedAt: new Date().toISOString(),
+      qrScanTimestamps: [...qrScanTimestamps, timestamp],
+      lastScannedAt: timestamp,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(entities));
   }
@@ -152,14 +155,55 @@ export const trackSocialClick = (entityId, platform) => {
   const entityIndex = entities.findIndex((e) => e.id === entityId);
 
   if (entityIndex >= 0) {
+    const timestamp = new Date().toISOString();
     const currentClicks = entities[entityIndex].socialClicks || {};
+    const clickTimestamps = entities[entityIndex].clickTimestamps || {};
+    const platformTimestamps = clickTimestamps[platform] || [];
+    
     entities[entityIndex] = {
       ...entities[entityIndex],
       socialClicks: {
         ...currentClicks,
         [platform]: (currentClicks[platform] || 0) + 1,
       },
-      lastClickedAt: new Date().toISOString(),
+      clickTimestamps: {
+        ...clickTimestamps,
+        [platform]: [...platformTimestamps, timestamp],
+      },
+      lastClickedAt: timestamp,
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(entities));
+  }
+};
+
+// Track custom link click
+export const trackCustomLinkClick = (entityId, customLinkIndex) => {
+  const entity = getEntityById(entityId); // No userId filter for tracking
+  if (!entity) return;
+  
+  // Don't track if entity is archived/inactive
+  if (entity.active === false) return;
+
+  const entities = getEntities(); // Get all entities for tracking
+  const entityIndex = entities.findIndex((e) => e.id === entityId);
+
+  if (entityIndex >= 0) {
+    const timestamp = new Date().toISOString();
+    const currentClicks = entities[entityIndex].customLinkClicks || {};
+    const customLinkClickTimestamps = entities[entityIndex].customLinkClickTimestamps || {};
+    const linkTimestamps = customLinkClickTimestamps[customLinkIndex] || [];
+    
+    entities[entityIndex] = {
+      ...entities[entityIndex],
+      customLinkClicks: {
+        ...currentClicks,
+        [customLinkIndex]: (currentClicks[customLinkIndex] || 0) + 1,
+      },
+      customLinkClickTimestamps: {
+        ...customLinkClickTimestamps,
+        [customLinkIndex]: [...linkTimestamps, timestamp],
+      },
+      lastClickedAt: timestamp,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(entities));
   }

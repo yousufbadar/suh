@@ -1,10 +1,25 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import './Home.css';
 import { FaHeart, FaQrcode, FaShareAlt, FaUsers, FaArrowRight, FaRocket } from 'react-icons/fa';
+import ThemeSelector from './ThemeSelector';
+import { getTheme, saveTheme, applyTheme } from '../utils/theme';
 
 function Home({ onGetStarted }) {
+  const [currentTheme, setCurrentTheme] = useState(getTheme());
+
+  useEffect(() => {
+    applyTheme(currentTheme);
+  }, [currentTheme]);
+
+  const handleThemeChange = (themeId) => {
+    setCurrentTheme(themeId);
+    saveTheme(themeId);
+    applyTheme(themeId);
+  };
+
   return (
     <div className="home-page">
+      <ThemeSelector currentTheme={currentTheme} onThemeChange={handleThemeChange} />
       <div className="home-hero">
         <div className="hero-content">
           <div className="hero-icon-wrapper">

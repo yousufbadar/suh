@@ -5,19 +5,26 @@ import RegistrationForm from './components/RegistrationForm';
 import EntityList from './components/EntityList';
 import EntityView from './components/EntityView';
 import SocialMediaIconsPage from './components/SocialMediaIconsPage';
+import ProfileDashboard from './components/ProfileDashboard';
 import ConfirmDialog from './components/ConfirmDialog';
+import ThemeSelector from './components/ThemeSelector';
 import { getEntities, deactivateEntity, reactivateEntity } from './utils/storage';
+import { getTheme, saveTheme, applyTheme } from './utils/theme';
 
 function App() {
-  const [currentPage, setCurrentPage] = useState('home'); // 'home', 'list', 'register', 'view', 'edit', 'icons'
+  const [currentPage, setCurrentPage] = useState('home'); // 'home', 'list', 'register', 'view', 'edit', 'icons', 'dashboard'
   const [entities, setEntities] = useState([]);
   const [selectedEntity, setSelectedEntity] = useState(null);
   const [editingEntity, setEditingEntity] = useState(null);
   const [uuid, setUuid] = useState(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [entityToDelete, setEntityToDelete] = useState(null);
+  const [currentTheme, setCurrentTheme] = useState(getTheme());
 
   useEffect(() => {
+    // Apply theme on mount
+    applyTheme(currentTheme);
+    
     // Load all entities (no authentication required)
     loadEntities();
     
@@ -33,7 +40,7 @@ function App() {
     if (currentPage === 'home') {
       return;
     }
-  }, []);
+  }, [currentTheme]);
 
   const loadEntities = () => {
     const loadedEntities = getEntities(); // Get all entities
@@ -44,6 +51,11 @@ function App() {
   const handleViewEntity = (entity) => {
     setSelectedEntity(entity);
     setCurrentPage('view');
+  };
+
+  const handleViewDashboard = (entity) => {
+    setSelectedEntity(entity);
+    setCurrentPage('dashboard');
   };
 
   const handleEditEntity = (entity) => {
@@ -103,6 +115,12 @@ function App() {
     setCurrentPage('list');
   };
 
+  const handleThemeChange = (themeId) => {
+    setCurrentTheme(themeId);
+    saveTheme(themeId);
+    applyTheme(themeId);
+  };
+
   // Render social media icons page separately (full screen without container)
   if (currentPage === 'icons') {
     return <SocialMediaIconsPage uuid={uuid} />;
@@ -115,6 +133,7 @@ function App() {
 
   return (
     <div className="App">
+      <ThemeSelector currentTheme={currentTheme} onThemeChange={handleThemeChange} />
       <ConfirmDialog
         isOpen={showConfirmDialog}
         title="Archive Profile"
@@ -189,6 +208,20 @@ function App() {
                     onBack={handleBackToList}
                     onEdit={(entity) => handleEditEntity(entity)}
                     onDelete={handleDeleteEntity}
+                    onViewDashboard={handleViewDashboard}
+                  />
+                )}
+              </>
+            )}
+
+            {currentPage === 'dashboard' && (
+              <>
+                {selectedEntity && (
+                  <ProfileDashboard
+                    entityId={selectedEntity.id}
+                    onBack={() => {
+                      setCurrentPage('view');
+                    }}
                   />
                 )}
               </>

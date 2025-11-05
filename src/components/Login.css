@@ -76,7 +76,7 @@
 .login-header h2 {
   font-size: 2rem;
   font-weight: 800;
-  background: linear-gradient(135deg, #ff006e 0%, #8338ec 50%, #3a86ff 100%);
+  background: linear-gradient(135deg, #ffd700 0%, #32cd32 50%, #28a745 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -118,7 +118,7 @@
 }
 
 .input-icon {
-  color: #667eea;
+  color: #32cd32;
   font-size: 1rem;
 }
 
@@ -153,7 +153,7 @@
 .login-button {
   width: 100%;
   padding: 14px;
-  background: linear-gradient(135deg, #ff006e 0%, #8338ec 100%);
+  background: linear-gradient(135deg, #ffd700 0%, #32cd32 100%);
   color: white;
   border: none;
   border-radius: 12px;
@@ -273,7 +273,7 @@
 .toggle-mode {
   background: none;
   border: none;
-  color: #667eea;
+  color: #32cd32;
   cursor: pointer;
   font-size: 0.95rem;
   font-weight: 600;
@@ -282,7 +282,7 @@
 }
 
 .toggle-mode:hover {
-  color: #ff006e;
+  color: #ffd700;
 }
 
 @media (max-width: 480px) {

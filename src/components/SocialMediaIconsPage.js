@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import './SocialMediaIconsPage.css';
-import { getEntityByUUID, trackQRScan, trackSocialClick } from '../utils/storage';
+import { getEntityByUUID, trackQRScan, trackSocialClick, trackCustomLinkClick } from '../utils/storage';
+import ThemeSelector from './ThemeSelector';
+import { getTheme, saveTheme, applyTheme } from '../utils/theme';
 import {
   FaFacebook,
   FaTwitter,
@@ -48,6 +50,17 @@ function SocialMediaIconsPage({ uuid }) {
   const [entity, setEntity] = useState(null);
   const [loading, setLoading] = useState(true);
   const hasTracked = useRef(false);
+  const [currentTheme, setCurrentTheme] = useState(getTheme());
+
+  useEffect(() => {
+    applyTheme(currentTheme);
+  }, [currentTheme]);
+
+  const handleThemeChange = (themeId) => {
+    setCurrentTheme(themeId);
+    saveTheme(themeId);
+    applyTheme(themeId);
+  };
 
   useEffect(() => {
     if (uuid && !hasTracked.current) {
@@ -77,8 +90,30 @@ function SocialMediaIconsPage({ uuid }) {
   }, [uuid]);
 
   const handleSocialClick = (platform, url, entityId) => {
+    if (!entity?.uuid || !entity?.active) {
+      window.open(url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
     // Track the click
     trackSocialClick(entityId, platform);
+    // Reload entity data to reflect updated click count
+    const updatedEntity = getEntityByUUID(uuid);
+    if (updatedEntity) {
+      setEntity(updatedEntity);
+    }
+    // Open in new tab
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleCustomLinkClick = (customLinkIndex, url, entityId) => {
+    if (!entity?.uuid || !entity?.active) {
+      window.open(url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    // Track the click
+    trackCustomLinkClick(entityId, customLinkIndex);
     // Reload entity data to reflect updated click count
     const updatedEntity = getEntityByUUID(uuid);
     if (updatedEntity) {
@@ -91,6 +126,7 @@ function SocialMediaIconsPage({ uuid }) {
   if (loading) {
     return (
       <div className="social-icons-page">
+        <ThemeSelector currentTheme={currentTheme} onThemeChange={handleThemeChange} />
         <div className="loading-container">
           <FaSpinner className="spinner" />
           <p>Loading...</p>
@@ -102,6 +138,7 @@ function SocialMediaIconsPage({ uuid }) {
   if (!entity) {
     return (
       <div className="social-icons-page">
+        <ThemeSelector currentTheme={currentTheme} onThemeChange={handleThemeChange} />
             <div className="error-container">
               <h1>Profile Not Found</h1>
               <p>The QR code is invalid or the profile has been removed.</p>
@@ -111,12 +148,14 @@ function SocialMediaIconsPage({ uuid }) {
   }
 
   const socialMediaLinks = Object.keys(entity.socialMedia || {});
+  const customLinks = entity.customLinks || [];
 
-  if (socialMediaLinks.length === 0) {
+  if (socialMediaLinks.length === 0 && customLinks.length === 0) {
     return (
       <div className="social-icons-page">
+        <ThemeSelector currentTheme={currentTheme} onThemeChange={handleThemeChange} />
         <div className="social-icons-container">
-          <p className="no-links-message">No social media links available for this profile.</p>
+          <p className="no-links-message">No links available for this profile.</p>
         </div>
       </div>
     );
@@ -124,6 +163,7 @@ function SocialMediaIconsPage({ uuid }) {
 
   return (
     <div className="social-icons-page">
+      <ThemeSelector currentTheme={currentTheme} onThemeChange={handleThemeChange} />
       <div className="social-icons-container">
         <div className="company-header">
           {entity.logo && (
@@ -159,6 +199,28 @@ function SocialMediaIconsPage({ uuid }) {
               </button>
             );
           })}
+          {customLinks.map((customLink, index) => (
+            <button
+              key={`custom-${index}`}
+              onClick={() => handleCustomLinkClick(index, customLink.link, entity.id)}
+              className="social-icon-button custom-link-button"
+              style={{
+                backgroundColor: '#32cd3215',
+                borderColor: '#32cd32',
+              }}
+              title={customLink.name}
+            >
+              {customLink.icon ? (
+                <img 
+                  src={customLink.icon} 
+                  alt={`${customLink.name} icon`}
+                  className="custom-link-icon-image-page"
+                />
+              ) : (
+                <span className="custom-link-icon-placeholder">{customLink.name.charAt(0)}</span>
+              )}
+            </button>
+          ))}
         </div>
       </div>
     </div>

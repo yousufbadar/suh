@@ -71,23 +71,26 @@ function RegistrationForm({ entity, onSave, onCancel }) {
     if (entity) {
       // Load entity data for editing - restore default domains for social media
       const socialMedia = { ...getInitialSocialMedia(), ...(entity.socialMedia || {}) };
-      return {
-        entityName: entity.entityName || '',
-        description: entity.description || '',
-        email: entity.email || '',
-        website: entity.website || '',
-        phone: entity.phone || '',
-        address: entity.address || '',
-        city: entity.city || '',
-        country: entity.country || '',
-        socialMedia: socialMedia,
-        logo: entity.logo || null,
-        customLinks: entity.customLinks || [
-          { name: '', icon: null, link: '' },
-          { name: '', icon: null, link: '' },
-          { name: '', icon: null, link: '' },
-        ],
-      };
+        return {
+          entityName: entity.entityName || '',
+          description: entity.description || '',
+          email: entity.email || '',
+          website: entity.website || '',
+          phone: entity.phone || '',
+          address: entity.address || '',
+          city: entity.city || '',
+          country: entity.country || '',
+          contactPersonName: entity.contactPersonName || '',
+          contactPersonEmail: entity.contactPersonEmail || '',
+          contactPersonPhone: entity.contactPersonPhone || '',
+          socialMedia: socialMedia,
+          logo: entity.logo || null,
+          customLinks: entity.customLinks || [
+            { name: '', icon: null, link: '' },
+            { name: '', icon: null, link: '' },
+            { name: '', icon: null, link: '' },
+          ],
+        };
     }
     return {
       entityName: '',
@@ -98,6 +101,9 @@ function RegistrationForm({ entity, onSave, onCancel }) {
       address: '',
       city: '',
       country: '',
+      contactPersonName: '',
+      contactPersonEmail: '',
+      contactPersonPhone: '',
       socialMedia: getInitialSocialMedia(),
       logo: null,
       customLinks: [
@@ -225,7 +231,10 @@ function RegistrationForm({ entity, onSave, onCancel }) {
       address: 200,
       city: 100,
       country: 100,
-      description: 2000
+      description: 2000,
+      contactPersonName: 100,
+      contactPersonEmail: 254,
+      contactPersonPhone: 20,
     };
     
     if (maxLengths[name] && value.length > maxLengths[name]) {
@@ -237,8 +246,12 @@ function RegistrationForm({ entity, onSave, onCancel }) {
       sanitizedValue = sanitizeText(sanitizedValue);
     } else if (name === 'email') {
       sanitizedValue = sanitizeText(sanitizedValue).toLowerCase().trim();
-    } else if (name === 'phone') {
-      sanitizedValue = sanitizeText(sanitizedValue);
+    } else if (name === 'phone' || name === 'contactPersonPhone') {
+      sanitizedValue = sanitizeText(sanitizedValue).trim();
+    } else if (name === 'contactPersonName') {
+      sanitizedValue = sanitizeText(sanitizedValue).trim();
+    } else if (name === 'contactPersonEmail') {
+      sanitizedValue = sanitizeText(sanitizedValue).toLowerCase().trim();
     } else if (name === 'description') {
       sanitizedValue = sanitizeText(sanitizedValue);
     } else if (name === 'website') {
@@ -406,6 +419,25 @@ function RegistrationForm({ entity, onSave, onCancel }) {
     // Validate phone
     if (formData.phone && formData.phone.trim() && !validatePhone(formData.phone)) {
       newErrors.phone = 'Please enter a valid phone number';
+    }
+
+    // Validate contact person fields (optional)
+    if (formData.contactPersonName && formData.contactPersonName.trim()) {
+      if (!validateLength(formData.contactPersonName, 1, 100)) {
+        newErrors.contactPersonName = 'Contact person name must be between 1 and 100 characters';
+      }
+    }
+
+    if (formData.contactPersonEmail && formData.contactPersonEmail.trim()) {
+      if (!validateEmail(formData.contactPersonEmail)) {
+        newErrors.contactPersonEmail = 'Please enter a valid email address for contact person';
+      }
+    }
+
+    if (formData.contactPersonPhone && formData.contactPersonPhone.trim()) {
+      if (!validatePhone(formData.contactPersonPhone)) {
+        newErrors.contactPersonPhone = 'Please enter a valid phone number for contact person';
+      }
     }
 
     // Validate text fields length
@@ -689,6 +721,57 @@ function RegistrationForm({ entity, onSave, onCancel }) {
               placeholder="+1 (555) 123-4567"
               maxLength={20}
             />
+          </div>
+        </div>
+      </div>
+
+      <div className="form-section">
+        <h2 className="section-title">Contact Person (Optional)</h2>
+        <p className="section-description">
+          Add a primary contact person for this company/brand. All fields are optional.
+        </p>
+        <div className="form-grid">
+          <div className="form-group">
+            <label htmlFor="contactPersonName">Contact Person Name</label>
+            <input
+              type="text"
+              id="contactPersonName"
+              name="contactPersonName"
+              value={formData.contactPersonName}
+              onChange={handleInputChange}
+              className={errors.contactPersonName ? 'error' : ''}
+              placeholder="John Doe"
+              maxLength={100}
+            />
+            {errors.contactPersonName && <span className="error-message">{errors.contactPersonName}</span>}
+          </div>
+          <div className="form-group">
+            <label htmlFor="contactPersonEmail">Contact Person Email</label>
+            <input
+              type="email"
+              id="contactPersonEmail"
+              name="contactPersonEmail"
+              value={formData.contactPersonEmail}
+              onChange={handleInputChange}
+              className={errors.contactPersonEmail ? 'error' : ''}
+              placeholder="john.doe@example.com"
+              maxLength={254}
+            />
+            {errors.contactPersonEmail && <span className="error-message">{errors.contactPersonEmail}</span>}
+          </div>
+          <div className="form-group">
+            <label htmlFor="contactPersonPhone">Contact Person Phone</label>
+            <input
+              type="tel"
+              id="contactPersonPhone"
+              name="contactPersonPhone"
+              value={formData.contactPersonPhone}
+              onChange={handleInputChange}
+              className={errors.contactPersonPhone ? 'error' : ''}
+              placeholder="+1 (555) 123-4567"
+              maxLength={20}
+            />
+            {errors.contactPersonPhone && <span className="error-message">{errors.contactPersonPhone}</span>}
           </div>
         </div>
       </div>

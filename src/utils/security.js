@@ -230,6 +230,9 @@ export const sanitizeFormData = (formData) => {
     address: formData.address ? sanitizeText(formData.address).trim() : '',
     city: formData.city ? sanitizeText(formData.city).trim() : '',
     country: formData.country ? sanitizeText(formData.country).trim() : '',
+    contactPersonName: formData.contactPersonName ? sanitizeText(formData.contactPersonName).trim() : '',
+    contactPersonEmail: formData.contactPersonEmail ? sanitizeText(formData.contactPersonEmail).toLowerCase().trim() : '',
+    contactPersonPhone: formData.contactPersonPhone ? sanitizeText(formData.contactPersonPhone).trim() : '',
     socialMedia: {},
     logo: formData.logo || null,
     customLinks: formData.customLinks || []
