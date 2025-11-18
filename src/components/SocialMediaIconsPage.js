@@ -52,6 +52,13 @@ function SocialMediaIconsPage({ uuid }) {
   const hasTracked = useRef(false);
   const [currentTheme, setCurrentTheme] = useState(getTheme());
 
+  // Apply theme on mount
+  useEffect(() => {
+    const theme = getTheme();
+    applyTheme(theme);
+  }, []);
+
+  // Apply theme when it changes
   useEffect(() => {
     applyTheme(currentTheme);
   }, [currentTheme]);
@@ -189,10 +196,7 @@ function SocialMediaIconsPage({ uuid }) {
                 key={platform}
                 onClick={() => handleSocialClick(platform, url, entity.id)}
                 className="social-icon-button"
-                style={{
-                  backgroundColor: `${platformData.color}15`,
-                  borderColor: platformData.color,
-                }}
+                style={{ color: platformData.color }}
                 title={platformData.name}
               >
                 <Icon
@@ -207,10 +211,6 @@ function SocialMediaIconsPage({ uuid }) {
               key={`custom-${index}`}
               onClick={() => handleCustomLinkClick(index, customLink.link, entity.id)}
               className="social-icon-button custom-link-button"
-              style={{
-                backgroundColor: '#32cd3215',
-                borderColor: '#32cd32',
-              }}
               title={customLink.name}
             >
               {customLink.icon ? (

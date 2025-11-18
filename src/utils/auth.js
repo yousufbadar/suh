@@ -1,53 +1,10 @@
-// Authentication utilities
+// Authentication utilities using Supabase Auth
 
-const USERS_STORAGE_KEY = 'authenticatedUsers';
-const CURRENT_USER_KEY = 'currentUser';
-const SESSION_KEY = 'userSession';
+import { supabase } from '../lib/supabase';
 
-// Simple password hashing (for demo - in production, use a backend with bcrypt)
-const hashPassword = async (password) => {
-  // Use Web Crypto API for secure hashing
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  return hashHex;
-};
-
-// Get all users
-export const getUsers = () => {
-  try {
-    const data = localStorage.getItem(USERS_STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
-  } catch (error) {
-    console.error('Error reading users from storage:', error);
-    return [];
-  }
-};
-
-// Save users
-const saveUsers = (users) => {
-  try {
-    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
-  } catch (error) {
-    console.error('Error saving users to storage:', error);
-    throw error;
-  }
-};
-
-// Generate user ID
-const generateUserId = () => {
-  return Date.now().toString() + Math.random().toString(36).substr(2, 9);
-};
-
-// Register new user
-export const registerUser = async (username, email, password) => {
+// Register new user with Supabase
+export const registerUser = async (email, password, username) => {
   // Validate inputs
-  if (!username || username.trim().length < 3) {
-    throw new Error('Username must be at least 3 characters');
-  }
-  
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     throw new Error('Please enter a valid email address');
   }
@@ -55,197 +12,178 @@ export const registerUser = async (username, email, password) => {
   if (!password || password.length < 6) {
     throw new Error('Password must be at least 6 characters');
   }
-  
-  const users = getUsers();
-  
-  // Check if username already exists
-  if (users.find(u => u.username.toLowerCase() === username.toLowerCase())) {
-    throw new Error('Username already exists');
+
+  // Sign up with Supabase
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        username: username || email.split('@')[0]
+      }
+    }
+  });
+
+  if (error) {
+    throw new Error(error.message || 'Registration failed');
   }
-  
-  // Check if email already exists
-  if (users.find(u => u.email.toLowerCase() === email.toLowerCase())) {
-    throw new Error('Email already registered');
-  }
-  
-  // Hash password
-  const hashedPassword = await hashPassword(password);
-  
-  // Create new user
-  const newUser = {
-    id: generateUserId(),
-    username: username.trim(),
-    email: email.toLowerCase().trim(),
-    password: hashedPassword, // In production, this should never be stored client-side
-    createdAt: new Date().toISOString(),
-    provider: 'local' // 'local', 'google', 'facebook', 'twitter'
-  };
-  
-  users.push(newUser);
-  saveUsers(users);
   
   return {
-    id: newUser.id,
-    username: newUser.username,
-    email: newUser.email,
-    provider: newUser.provider
+    id: data.user?.id,
+    email: data.user?.email,
+    username: data.user?.user_metadata?.username || email.split('@')[0]
   };
 };
 
-// Login user
-export const loginUser = async (usernameOrEmail, password) => {
-  const users = getUsers();
-  
-  // Find user by username or email
-  const user = users.find(
-    u => u.username.toLowerCase() === usernameOrEmail.toLowerCase() ||
-         u.email.toLowerCase() === usernameOrEmail.toLowerCase()
-  );
-  
-  if (!user) {
-    throw new Error('Invalid username or password');
+// Login user with Supabase
+export const loginUser = async (email, password) => {
+  if (!email || !password) {
+    throw new Error('Email and password are required');
   }
-  
-  // For SSO users, password might not be set
-  if (user.provider !== 'local') {
-    throw new Error('Please sign in with your social account');
-  }
-  
-  // Verify password
-  const hashedPassword = await hashPassword(password);
-  if (user.password !== hashedPassword) {
-    throw new Error('Invalid username or password');
-  }
-  
-  // Create session
-  const session = {
-    userId: user.id,
-    username: user.username,
-    email: user.email,
-    provider: user.provider,
-    loginTime: new Date().toISOString(),
-    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
-  };
-  
-  localStorage.setItem(CURRENT_USER_KEY, JSON.stringify({
-    id: user.id,
-    username: user.username,
-    email: user.email,
-    provider: user.provider
-  }));
-  
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-  
-  return {
-    id: user.id,
-    username: user.username,
-    email: user.email,
-    provider: user.provider
-  };
-};
 
-// SSO Login (Google, Facebook, Twitter)
-export const ssoLogin = async (provider, userData) => {
-  // userData should contain: id, email, name, picture (from OAuth provider)
-  if (!userData || !userData.email) {
-    throw new Error('Invalid user data from provider');
+  // Check if Supabase client is properly configured
+  if (!supabase || !supabase.auth) {
+    console.error('❌ Supabase client is not properly initialized');
+    throw new Error('Database connection error. Please check your configuration and restart the server.');
   }
-  
-  const users = getUsers();
-  
-  // Check if user exists with this email and provider
-  let user = users.find(
-    u => u.email.toLowerCase() === userData.email.toLowerCase() && u.provider === provider
-  );
-  
-  if (!user) {
-    // Create new user for SSO
-    user = {
-      id: generateUserId(),
-      username: userData.name || userData.email.split('@')[0],
-      email: userData.email.toLowerCase(),
-      password: null, // No password for SSO
-      createdAt: new Date().toISOString(),
-      provider: provider,
-      ssoId: userData.id,
-      picture: userData.picture || null
+
+  try {
+    console.log('🔐 Attempting login for:', email);
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      console.error('❌ Login error:', error);
+      console.error('Error details:', {
+        message: error.message,
+        status: error.status,
+        name: error.name,
+      });
+      
+      // Provide more specific error messages
+      let errorMessage = error.message || 'Invalid email or password';
+      
+      if (error.message?.includes('Invalid login credentials')) {
+        errorMessage = 'Invalid email or password. Please check your credentials and try again.';
+      } else if (error.message?.includes('Email not confirmed')) {
+        errorMessage = 'Please check your email and confirm your account before logging in.';
+      } else if (error.message?.includes('Too many requests')) {
+        errorMessage = 'Too many login attempts. Please wait a moment and try again.';
+      }
+      
+      throw new Error(errorMessage);
+    }
+
+    if (!data || !data.user) {
+      console.error('❌ Login succeeded but no user data returned');
+      throw new Error('Login failed. Please try again.');
+    }
+
+    console.log('✅ Login successful for:', data.user.email);
+    
+    const user = {
+      id: data.user.id,
+      email: data.user.email,
+      username: data.user.user_metadata?.username || email.split('@')[0]
     };
     
-    users.push(user);
-    saveUsers(users);
-  }
-  
-  // Create session
-  const session = {
-    userId: user.id,
-    username: user.username,
-    email: user.email,
-    provider: user.provider,
-    loginTime: new Date().toISOString(),
-    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-  };
-  
-  localStorage.setItem(CURRENT_USER_KEY, JSON.stringify({
-    id: user.id,
-    username: user.username,
-    email: user.email,
-    provider: user.provider,
-    picture: user.picture
-  }));
-  
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-  
-  return {
-    id: user.id,
-    username: user.username,
-    email: user.email,
-    provider: user.provider,
-    picture: user.picture
-  };
-};
-
-// Logout user
-export const logoutUser = () => {
-  localStorage.removeItem(CURRENT_USER_KEY);
-  localStorage.removeItem(SESSION_KEY);
-};
-
-// Get current user
-export const getCurrentUser = () => {
-  try {
-    const userData = localStorage.getItem(CURRENT_USER_KEY);
-    if (!userData) return null;
-    
-    const user = JSON.parse(userData);
-    
-    // Check if session is still valid
-    const sessionData = localStorage.getItem(SESSION_KEY);
-    if (sessionData) {
-      const session = JSON.parse(sessionData);
-      if (new Date(session.expiresAt) > new Date()) {
-        return user;
-      } else {
-        // Session expired
-        logoutUser();
-        return null;
-      }
+    // Verify session was created
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      console.warn('⚠️  Login succeeded but no session found');
+    } else {
+      console.log('✅ Session created successfully');
     }
     
     return user;
   } catch (error) {
-    console.error('Error getting current user:', error);
+    console.error('❌ Login failed:', error);
+    throw error;
+  }
+};
+
+// Logout user
+export const logoutUser = async () => {
+  const { error } = await supabase.auth.signOut();
+  if (error) {
+    throw new Error(error.message || 'Logout failed');
+  }
+};
+
+// Get current user
+export const getCurrentUser = async () => {
+  try {
+    // Check if Supabase client is properly configured
+    if (!supabase || !supabase.auth) {
+      console.warn('⚠️  Supabase client is not properly initialized');
+      return null;
+    }
+
+    // First check session
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) {
+      console.error('❌ Error getting session:', sessionError);
+      return null;
+    }
+
+    if (!session) {
+      console.log('ℹ️  No active session found');
+      return null;
+    }
+
+    // Then get user
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error) {
+      console.error('❌ Error getting current user:', error);
+      return null;
+    }
+    
+    if (!user) {
+      return null;
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+      username: user.user_metadata?.username || user.email?.split('@')[0]
+    };
+  } catch (error) {
+    console.error('❌ Unexpected error getting current user:', error);
     return null;
   }
 };
 
 // Check if user is authenticated
-export const isAuthenticated = () => {
-  return getCurrentUser() !== null;
+export const isAuthenticated = async () => {
+  const { data: { session } } = await supabase.auth.getSession();
+  return !!session;
 };
 
 // Get user by ID
-export const getUserById = (userId) => {
-  const users = getUsers();
-  return users.find(u => u.id === userId);
+export const getUserById = async (userId) => {
+  const { data: { user }, error } = await supabase.auth.admin?.getUserById(userId);
+  if (error) {
+    console.error('Error getting user by ID:', error);
+    return null;
+  }
+  return user;
+};
+
+// SSO Login (for future implementation)
+export const ssoLogin = async (provider) => {
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: provider,
+    options: {
+      redirectTo: `${window.location.origin}/auth/callback`
+    }
+  });
+
+  if (error) {
+    throw new Error(error.message || 'SSO login failed');
+  }
+  
+  return data;
 };
 

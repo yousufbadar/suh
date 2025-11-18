@@ -65,7 +65,7 @@ const getInitialSocialMedia = () => {
   return initialSocial;
 };
 
-function RegistrationForm({ entity, onSave, onCancel }) {
+function RegistrationForm({ entity, onSave, onCancel, currentUser }) {
   // Memoize initial form data based on entity
   const initialFormData = useMemo(() => {
     if (entity) {
@@ -569,8 +569,9 @@ function RegistrationForm({ entity, onSave, onCancel }) {
       };
 
       try {
-        // Save to Supabase database (no authentication required)
-        const savedEntity = await saveEntity(dataToSave);
+        // Save to Supabase database - use current user's ID if logged in
+        const userId = currentUser?.id || null;
+        const savedEntity = await saveEntity(dataToSave, userId);
 
         console.log('Form submitted:', savedEntity);
         setSubmitted(true);

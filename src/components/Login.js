@@ -45,23 +45,48 @@ function Login({ onLoginSuccess, onClose }) {
         // Login
         if (!formData.username || !formData.password) {
           setErrors({
-            username: !formData.username ? 'Username or email is required' : '',
+            username: !formData.username ? 'Email is required' : '',
             password: !formData.password ? 'Password is required' : ''
           });
           setIsLoading(false);
           return;
         }
 
-        const user = await loginUser(formData.username, formData.password);
-        onLoginSuccess(user);
-        if (onClose) onClose();
+        // Use email for login (formData.username can be email)
+        const email = formData.username.includes('@') ? formData.username : `${formData.username}@admin.com`;
+        console.log('🔐 Attempting login with email:', email);
+        
+        // Add timeout to prevent hanging
+        const loginPromise = loginUser(email, formData.password);
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Login request timed out. Please try again.')), 30000)
+        );
+        
+        const user = await Promise.race([loginPromise, timeoutPromise]);
+        console.log('✅ Login successful, calling onLoginSuccess');
+        
+        // Call onLoginSuccess and wait for it, but don't let errors here prevent loading state reset
+        try {
+          if (onLoginSuccess) {
+            // Add timeout for navigation callback as well
+            const callbackPromise = Promise.resolve(onLoginSuccess(user));
+            const callbackTimeout = new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('Navigation timeout')), 5000)
+            );
+            await Promise.race([callbackPromise, callbackTimeout]);
+          }
+        } catch (callbackError) {
+          console.error('❌ Error in onLoginSuccess callback:', callbackError);
+          // Don't throw - navigation errors shouldn't prevent login completion
+        }
+        
+        // Close modal if callback provided
+        if (onClose) {
+          onClose();
+        }
       } else {
         // Register
         const newErrors = {};
-
-        if (!formData.username || formData.username.trim().length < 3) {
-          newErrors.username = 'Username must be at least 3 characters';
-        }
 
         if (!formData.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
           newErrors.email = 'Please enter a valid email address';
@@ -81,13 +106,40 @@ function Login({ onLoginSuccess, onClose }) {
           return;
         }
 
-        const user = await registerUser(formData.username, formData.email, formData.password);
-        onLoginSuccess(user);
-        if (onClose) onClose();
+        console.log('📝 Attempting registration with email:', formData.email);
+        const user = await registerUser(formData.email, formData.password, formData.username);
+        console.log('✅ Registration successful, calling onLoginSuccess');
+        
+        // Call onLoginSuccess and wait for it, but don't let errors here prevent loading state reset
+        try {
+          if (onLoginSuccess) {
+            await Promise.resolve(onLoginSuccess(user));
+          }
+        } catch (callbackError) {
+          console.error('❌ Error in onLoginSuccess callback:', callbackError);
+          // Don't throw - navigation errors shouldn't prevent registration completion
+        }
+        
+        // Close modal if callback provided
+        if (onClose) {
+          onClose();
+        }
       }
     } catch (error) {
-      setGeneralError(error.message || 'An error occurred. Please try again.');
+      console.error('❌ Login/Registration error:', error);
+      const errorMessage = error.message || 'An error occurred. Please try again.';
+      setGeneralError(errorMessage);
+      
+      // Log additional error details for debugging
+      if (error.message) {
+        console.error('Error message:', error.message);
+      }
+      if (error.stack) {
+        console.error('Error stack:', error.stack);
+      }
     } finally {
+      // Always reset loading state, even if there were errors
+      console.log('🔄 Resetting loading state');
       setIsLoading(false);
     }
   };
@@ -162,16 +214,16 @@ function Login({ onLoginSuccess, onClose }) {
             <div className="form-group">
               <label htmlFor="usernameOrEmail">
                 <FaUser className="input-icon" />
-                Username or Email
+                Email
               </label>
               <input
-                type="text"
+                type="email"
                 id="usernameOrEmail"
                 name="username"
                 value={formData.username}
                 onChange={handleInputChange}
                 className={errors.username ? 'error' : ''}
-                placeholder="Enter username or email"
+                placeholder="Enter your email"
                 maxLength={254}
               />
               {errors.username && <span className="error-message">{errors.username}</span>}

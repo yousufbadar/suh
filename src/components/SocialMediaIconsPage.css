@@ -1,29 +1,68 @@
 .social-icons-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #32cd32 0%, #28a745 100%);
+  background: linear-gradient(135deg, var(--theme-primary, #ffd700) 0%, var(--theme-secondary, #32cd32) 25%, var(--theme-tertiary, #28a745) 50%, var(--theme-primary, #ffd700) 75%, var(--theme-secondary, #32cd32) 100%);
+  background-size: 400% 400%;
+  animation: gradientShift 15s ease infinite;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.social-icons-page::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+              radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 
 .social-icons-container {
-  background: white;
-  border-radius: 20px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  padding: 40px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 32px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2),
+              0 0 0 1px rgba(255, 255, 255, 0.3) inset;
+  padding: 50px 40px;
   width: 100%;
-  max-width: 800px;
+  max-width: 900px;
+  position: relative;
+  z-index: 1;
+  animation: fadeInUp 0.6s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .company-header {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  margin-bottom: 40px;
-  gap: 20px;
-  flex-wrap: wrap;
+  margin-bottom: 50px;
+  gap: 24px;
+  text-align: center;
 }
 
 .company-logo-wrapper {
@@ -31,116 +70,221 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  position: relative;
+  animation: logoFloat 3s ease-in-out infinite;
+}
+
+@keyframes logoFloat {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
 }
 
 .company-logo {
-  max-width: 150px;
-  max-height: 150px;
+  max-width: 140px;
+  max-height: 140px;
   width: auto;
   height: auto;
   object-fit: contain;
-  border-radius: 12px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  border-radius: 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15),
+              0 0 0 4px rgba(255, 255, 255, 0.5);
+  background: white;
+  padding: 8px;
+  transition: transform 0.3s ease;
+}
+
+.company-logo:hover {
+  transform: scale(1.05);
 }
 
 .company-name {
-  font-size: 2rem;
-  font-weight: 700;
-  color: #333;
+  font-size: 2.5rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--theme-primary, #ffd700) 0%, var(--theme-secondary, #32cd32) 50%, var(--theme-tertiary, #28a745) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   text-align: center;
   margin: 0;
   word-wrap: break-word;
   overflow-wrap: break-word;
-  flex: 1;
-  min-width: 0;
+  letter-spacing: -0.5px;
+  line-height: 1.2;
 }
 
 .social-icons-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 24px;
   justify-items: center;
   align-items: center;
 }
 
 .social-icon-button {
   position: relative;
-  width: 80px;
-  height: 80px;
-  border-radius: 12px;
-  border: 3px solid;
-  background: white;
+  width: 100px;
+  height: 100px;
+  border-radius: 20px;
+  border: none;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.7) 100%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12),
+              0 0 0 2px rgba(255, 255, 255, 0.5) inset;
+  overflow: hidden;
+}
+
+.social-icon-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, transparent 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
 }
 
 .social-icon-button:hover {
-  transform: translateY(-5px) scale(1.1);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+  transform: translateY(-8px) scale(1.08);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.2),
+              0 0 0 3px currentColor inset,
+              0 0 20px rgba(255, 255, 255, 0.5);
+}
+
+.social-icon-button:hover::before {
+  opacity: 1;
 }
 
 .social-icon-button:active {
-  transform: translateY(-2px) scale(1.05);
+  transform: translateY(-4px) scale(1.04);
+  transition: all 0.1s ease;
 }
 
 .social-icon-svg {
-  font-size: 2rem;
+  font-size: 2.5rem;
   width: 1em;
   height: 1em;
   display: block;
+  position: relative;
+  z-index: 1;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+  transition: transform 0.3s ease;
+}
+
+.social-icon-button:hover .social-icon-svg {
+  transform: scale(1.1) rotate(5deg);
 }
 
 .custom-link-button {
   position: relative;
-  width: 80px;
-  height: 80px;
-  border-radius: 12px;
-  border: 3px solid;
-  background: white;
+  width: 100px;
+  height: 100px;
+  border-radius: 20px;
+  border: none;
+  background: linear-gradient(135deg, rgba(50, 205, 50, 0.15) 0%, rgba(40, 167, 69, 0.1) 100%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-  padding: 8px;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 8px 24px rgba(50, 205, 50, 0.2),
+              0 0 0 2px rgba(50, 205, 50, 0.3) inset;
+  overflow: hidden;
+  padding: 12px;
+}
+
+.custom-link-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(50, 205, 50, 0.2) 0%, transparent 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.custom-link-button:hover {
+  transform: translateY(-8px) scale(1.08);
+  box-shadow: 0 16px 40px rgba(50, 205, 50, 0.3),
+              0 0 0 3px rgba(50, 205, 50, 0.5) inset,
+              0 0 20px rgba(50, 205, 50, 0.4);
+  background: linear-gradient(135deg, rgba(50, 205, 50, 0.25) 0%, rgba(40, 167, 69, 0.15) 100%);
+}
+
+.custom-link-button:hover::before {
+  opacity: 1;
+}
+
+.custom-link-button:active {
+  transform: translateY(-4px) scale(1.04);
+  transition: all 0.1s ease;
 }
 
 .custom-link-icon-image-page {
   width: 100%;
   height: 100%;
-  max-width: 64px;
-  max-height: 64px;
+  max-width: 76px;
+  max-height: 76px;
   object-fit: contain;
+  position: relative;
+  z-index: 1;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+  transition: transform 0.3s ease;
+}
+
+.custom-link-button:hover .custom-link-icon-image-page {
+  transform: scale(1.1) rotate(5deg);
 }
 
 .custom-link-icon-placeholder {
-  font-size: 2rem;
-  font-weight: 700;
-  color: #32cd32;
+  font-size: 2.5rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--theme-secondary, #32cd32) 0%, var(--theme-tertiary, #28a745) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 100%;
   height: 100%;
+  position: relative;
+  z-index: 1;
+  transition: transform 0.3s ease;
+}
+
+.custom-link-button:hover .custom-link-icon-placeholder {
+  transform: scale(1.1);
 }
 
 
 .loading-container,
 .error-container {
   text-align: center;
-  padding: 40px;
+  padding: 60px 40px;
+  animation: fadeInUp 0.6s ease-out;
 }
 
 .loading-container .spinner {
-  font-size: 3rem;
-  color: #32cd32;
+  font-size: 3.5rem;
+  background: linear-gradient(135deg, var(--theme-primary, #ffd700) 0%, var(--theme-secondary, #32cd32) 50%, var(--theme-tertiary, #28a745) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   animation: spin 1s linear infinite;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.2));
 }
 
 @keyframes spin {
@@ -152,93 +296,145 @@
   }
 }
 
+.loading-container p {
+  font-size: 1.2rem;
+  color: #666;
+  font-weight: 500;
+  margin-top: 16px;
+}
+
 .error-container h1 {
-  color: #e4405f;
-  margin-bottom: 15px;
+  font-size: 2.5rem;
+  background: linear-gradient(135deg, #e4405f 0%, #ff6b9d 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 16px;
+  font-weight: 800;
 }
 
 .error-container p {
   color: #666;
-  font-size: 1.1rem;
+  font-size: 1.15rem;
+  line-height: 1.6;
 }
 
 .no-links-message {
   text-align: center;
   color: #666;
-  font-size: 1.2rem;
-  padding: 40px;
+  font-size: 1.3rem;
+  padding: 60px 40px;
+  font-weight: 500;
+  line-height: 1.6;
 }
 
 @media (max-width: 768px) {
   .social-icons-container {
-    padding: 30px 20px;
+    padding: 40px 30px;
+    border-radius: 24px;
   }
 
   .company-header {
-    margin-bottom: 30px;
-    gap: 15px;
-    flex-direction: column;
-  }
-
-  .company-name {
-    text-align: center;
+    margin-bottom: 40px;
+    gap: 20px;
   }
 
   .company-logo {
     max-width: 120px;
     max-height: 120px;
+    border-radius: 20px;
   }
 
   .company-name {
-    font-size: 1.75rem;
+    font-size: 2rem;
   }
 
   .social-icons-grid {
-    grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
-    gap: 15px;
+    grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+    gap: 20px;
   }
 
   .social-icon-button {
-    width: 70px;
-    height: 70px;
+    width: 90px;
+    height: 90px;
+    border-radius: 18px;
   }
 
   .social-icon-svg {
-    font-size: 1.75rem;
+    font-size: 2.2rem;
+  }
+
+  .custom-link-button {
+    width: 90px;
+    height: 90px;
+    border-radius: 18px;
+    padding: 10px;
+  }
+
+  .custom-link-icon-image-page {
+    max-width: 70px;
+    max-height: 70px;
+  }
+
+  .custom-link-icon-placeholder {
+    font-size: 2.2rem;
   }
 }
 
 @media (max-width: 480px) {
+  .social-icons-page {
+    padding: 15px;
+  }
+
   .social-icons-container {
-    padding: 20px 15px;
+    padding: 30px 20px;
+    border-radius: 20px;
   }
 
   .company-header {
-    margin-bottom: 25px;
-    gap: 12px;
+    margin-bottom: 35px;
+    gap: 16px;
   }
 
   .company-logo {
     max-width: 100px;
     max-height: 100px;
+    border-radius: 16px;
   }
 
   .company-name {
-    font-size: 1.5rem;
+    font-size: 1.75rem;
   }
 
   .social-icons-grid {
-    grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+    gap: 16px;
   }
 
   .social-icon-button {
-    width: 60px;
-    height: 60px;
+    width: 80px;
+    height: 80px;
+    border-radius: 16px;
   }
 
   .social-icon-svg {
-    font-size: 1.5rem;
+    font-size: 2rem;
+  }
+
+  .custom-link-button {
+    width: 80px;
+    height: 80px;
+    border-radius: 16px;
+    padding: 8px;
+  }
+
+  .custom-link-icon-image-page {
+    max-width: 64px;
+    max-height: 64px;
+  }
+
+  .custom-link-icon-placeholder {
+    font-size: 2rem;
   }
 }
 
