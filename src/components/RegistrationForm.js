@@ -33,27 +33,30 @@ import {
   FaFlickr,
   FaImage,
   FaTimes,
+  FaUserPlus,
+  FaExternalLinkAlt,
+  FaSignOutAlt,
 } from 'react-icons/fa';
 
 const socialMediaPlatforms = [
-  { name: 'Facebook', icon: FaFacebook, color: '#1877f2', defaultDomain: 'https://facebook.com/', placeholder: 'https://facebook.com/yourpage' },
-  { name: 'Twitter', icon: FaTwitter, color: '#1da1f2', defaultDomain: 'https://twitter.com/', placeholder: 'https://twitter.com/yourhandle' },
-  { name: 'Instagram', icon: FaInstagram, color: '#e4405f', defaultDomain: 'https://instagram.com/', placeholder: 'https://instagram.com/yourprofile' },
-  { name: 'LinkedIn', icon: FaLinkedin, color: '#0077b5', defaultDomain: 'https://linkedin.com/', placeholder: 'https://linkedin.com/company/yourcompany' },
-  { name: 'YouTube', icon: FaYoutube, color: '#ff0000', defaultDomain: 'https://youtube.com/', placeholder: 'https://youtube.com/yourchannel' },
-  { name: 'Pinterest', icon: FaPinterest, color: '#bd081c', defaultDomain: 'https://pinterest.com/', placeholder: 'https://pinterest.com/yourprofile' },
-  { name: 'Snapchat', icon: FaSnapchat, color: '#fffc00', defaultDomain: 'https://snapchat.com/add/', placeholder: 'https://snapchat.com/add/yourusername' },
-  { name: 'TikTok', icon: FaTiktok, color: '#000000', defaultDomain: 'https://tiktok.com/@', placeholder: 'https://tiktok.com/@yourhandle' },
-  { name: 'Reddit', icon: FaReddit, color: '#ff4500', defaultDomain: 'https://reddit.com/user/', placeholder: 'https://reddit.com/user/yourusername' },
-  { name: 'GitHub', icon: FaGithub, color: '#181717', defaultDomain: 'https://github.com/', placeholder: 'https://github.com/yourusername' },
-  { name: 'Dribbble', icon: FaDribbble, color: '#ea4c89', defaultDomain: 'https://dribbble.com/', placeholder: 'https://dribbble.com/yourprofile' },
-  { name: 'Behance', icon: FaBehance, color: '#1769ff', defaultDomain: 'https://behance.net/', placeholder: 'https://behance.net/yourprofile' },
-  { name: 'Telegram', icon: FaTelegram, color: '#0088cc', defaultDomain: 'https://t.me/', placeholder: 'https://t.me/yourchannel' },
-  { name: 'WhatsApp', icon: FaWhatsapp, color: '#25d366', defaultDomain: 'https://wa.me/', placeholder: 'https://wa.me/yournumber' },
-  { name: 'Discord', icon: FaDiscord, color: '#5865f2', defaultDomain: 'https://discord.gg/', placeholder: 'https://discord.gg/yourserver' },
-  { name: 'Twitch', icon: FaTwitch, color: '#9146ff', defaultDomain: 'https://twitch.tv/', placeholder: 'https://twitch.tv/yourchannel' },
-  { name: 'Vimeo', icon: FaVimeo, color: '#1ab7ea', defaultDomain: 'https://vimeo.com/', placeholder: 'https://vimeo.com/yourprofile' },
-  { name: 'Flickr', icon: FaFlickr, color: '#ff0084', defaultDomain: 'https://flickr.com/photos/', placeholder: 'https://flickr.com/photos/yourprofile' },
+  { name: 'Facebook', icon: FaFacebook, color: '#1877f2', defaultDomain: 'https://facebook.com/', placeholder: 'https://facebook.com/yourpage', signupUrl: 'https://www.facebook.com/r.php' },
+  { name: 'Twitter', icon: FaTwitter, color: '#1da1f2', defaultDomain: 'https://twitter.com/', placeholder: 'https://twitter.com/yourhandle', signupUrl: 'https://twitter.com/i/flow/signup' },
+  { name: 'Instagram', icon: FaInstagram, color: '#e4405f', defaultDomain: 'https://instagram.com/', placeholder: 'https://instagram.com/yourprofile', signupUrl: 'https://www.instagram.com/accounts/emailsignup/' },
+  { name: 'LinkedIn', icon: FaLinkedin, color: '#0077b5', defaultDomain: 'https://linkedin.com/', placeholder: 'https://linkedin.com/company/yourcompany', signupUrl: 'https://www.linkedin.com/signup' },
+  { name: 'YouTube', icon: FaYoutube, color: '#ff0000', defaultDomain: 'https://youtube.com/', placeholder: 'https://youtube.com/yourchannel', signupUrl: 'https://accounts.google.com/signup/v2/webcreateaccount?flowName=GlifWebSignIn&flowEntry=SignUp' },
+  { name: 'Pinterest', icon: FaPinterest, color: '#bd081c', defaultDomain: 'https://pinterest.com/', placeholder: 'https://pinterest.com/yourprofile', signupUrl: 'https://www.pinterest.com/join/' },
+  { name: 'Snapchat', icon: FaSnapchat, color: '#fffc00', defaultDomain: 'https://snapchat.com/add/', placeholder: 'https://snapchat.com/add/yourusername', signupUrl: 'https://accounts.snapchat.com/accounts/signup' },
+  { name: 'TikTok', icon: FaTiktok, color: '#000000', defaultDomain: 'https://tiktok.com/@', placeholder: 'https://tiktok.com/@yourhandle', signupUrl: 'https://www.tiktok.com/signup' },
+  { name: 'Reddit', icon: FaReddit, color: '#ff4500', defaultDomain: 'https://reddit.com/user/', placeholder: 'https://reddit.com/user/yourusername', signupUrl: 'https://www.reddit.com/register' },
+  { name: 'GitHub', icon: FaGithub, color: '#181717', defaultDomain: 'https://github.com/', placeholder: 'https://github.com/yourusername', signupUrl: 'https://github.com/signup' },
+  { name: 'Dribbble', icon: FaDribbble, color: '#ea4c89', defaultDomain: 'https://dribbble.com/', placeholder: 'https://dribbble.com/yourprofile', signupUrl: 'https://dribbble.com/signup/new' },
+  { name: 'Behance', icon: FaBehance, color: '#1769ff', defaultDomain: 'https://behance.net/', placeholder: 'https://behance.net/yourprofile', signupUrl: 'https://www.behance.net/signup' },
+  { name: 'Telegram', icon: FaTelegram, color: '#0088cc', defaultDomain: 'https://t.me/', placeholder: 'https://t.me/yourchannel', signupUrl: 'https://telegram.org/' },
+  { name: 'WhatsApp', icon: FaWhatsapp, color: '#25d366', defaultDomain: 'https://wa.me/', placeholder: 'https://wa.me/yournumber', signupUrl: 'https://www.whatsapp.com/download' },
+  { name: 'Discord', icon: FaDiscord, color: '#5865f2', defaultDomain: 'https://discord.gg/', placeholder: 'https://discord.gg/yourserver', signupUrl: 'https://discord.com/register' },
+  { name: 'Twitch', icon: FaTwitch, color: '#9146ff', defaultDomain: 'https://twitch.tv/', placeholder: 'https://twitch.tv/yourchannel', signupUrl: 'https://www.twitch.tv/signup' },
+  { name: 'Vimeo', icon: FaVimeo, color: '#1ab7ea', defaultDomain: 'https://vimeo.com/', placeholder: 'https://vimeo.com/yourprofile', signupUrl: 'https://vimeo.com/join' },
+  { name: 'Flickr', icon: FaFlickr, color: '#ff0084', defaultDomain: 'https://flickr.com/photos/', placeholder: 'https://flickr.com/photos/yourprofile', signupUrl: 'https://www.flickr.com/signup' },
 ];
 
 // Initialize default social media URLs
@@ -65,7 +68,7 @@ const getInitialSocialMedia = () => {
   return initialSocial;
 };
 
-function RegistrationForm({ entity, onSave, onCancel, currentUser }) {
+function RegistrationForm({ entity, onSave, onCancel, currentUser, onLogout }) {
   // Memoize initial form data based on entity
   const initialFormData = useMemo(() => {
     if (entity) {
@@ -609,6 +612,14 @@ function RegistrationForm({ entity, onSave, onCancel, currentUser }) {
   }
 
   return (
+    <div>
+      {onLogout && currentUser && (
+        <div className="logout-container-form">
+          <button onClick={onLogout} className="logout-button-form" title="Logout">
+            <FaSignOutAlt /> Logout ({currentUser.username || currentUser.name || currentUser.email?.split('@')[0] || 'User'})
+          </button>
+        </div>
+      )}
     <form onSubmit={handleSubmit} className="registration-form">
       <div className="form-section">
         <h2 className="section-title">Basic Information</h2>
@@ -839,7 +850,23 @@ function RegistrationForm({ entity, onSave, onCancel, currentUser }) {
                   <Icon className="social-icon" style={{ color: platform.color }} />
                 </div>
                 <div className="social-input-wrapper">
-                  <label htmlFor={platformKey}>{platform.name}</label>
+                  <div className="social-input-header">
+                    <label htmlFor={platformKey}>{platform.name}</label>
+                    {platform.signupUrl && (
+                      <a
+                        href={platform.signupUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="create-account-link"
+                        title={`Create ${platform.name} account`}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <FaUserPlus className="create-account-icon" />
+                        <span className="create-account-text">Create Account</span>
+                        <FaExternalLinkAlt className="external-link-icon" />
+                      </a>
+                    )}
+                  </div>
                   <input
                     type="url"
                     id={platformKey}
@@ -977,6 +1004,7 @@ function RegistrationForm({ entity, onSave, onCancel, currentUser }) {
         </div>
       </div>
     </form>
+    </div>
   );
 }
 

@@ -33,10 +33,9 @@ import {
   FaCopy,
   FaCheck,
   FaDownload,
-  FaQrcode,
-  FaEye,
   FaHeart,
   FaChartBar,
+  FaSignOutAlt,
 } from 'react-icons/fa';
 
 const socialMediaPlatforms = {
@@ -60,7 +59,7 @@ const socialMediaPlatforms = {
   flickr: { name: 'Flickr', icon: FaFlickr, color: '#ff0084' },
 };
 
-function EntityView({ entity, onBack, onEdit, onDelete, onViewDashboard }) {
+function EntityView({ entity, onBack, onEdit, onDelete, onViewDashboard, onLogout, currentUser }) {
   const [copied, setCopied] = useState(false);
   const [currentEntity, setCurrentEntity] = useState(entity);
 
@@ -209,6 +208,13 @@ function EntityView({ entity, onBack, onEdit, onDelete, onViewDashboard }) {
 
   return (
     <div className="entity-view">
+      {onLogout && currentUser && (
+        <div className="logout-container-view">
+          <button onClick={onLogout} className="logout-button-view" title="Logout">
+            <FaSignOutAlt /> Logout ({currentUser.username || currentUser.name || currentUser.email?.split('@')[0] || 'User'})
+          </button>
+        </div>
+      )}
           <div className="entity-view-header">
             <button onClick={onBack} className="back-button">
               <FaArrowLeft /> Back to Profiles

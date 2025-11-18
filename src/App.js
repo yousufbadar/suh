@@ -8,9 +8,8 @@ import EntityView from './components/EntityView';
 import SocialMediaIconsPage from './components/SocialMediaIconsPage';
 import ProfileDashboard from './components/ProfileDashboard';
 import ConfirmDialog from './components/ConfirmDialog';
-import ThemeSelector from './components/ThemeSelector';
 import { getEntities, deactivateEntity, reactivateEntity } from './utils/storage';
-import { getTheme, saveTheme, applyTheme } from './utils/theme';
+import { getTheme, applyTheme } from './utils/theme';
 import { supabase, isClientValid, testConnection } from './lib/supabase';
 import { getCurrentUser, logoutUser } from './utils/auth';
 
@@ -406,11 +405,6 @@ function App() {
     setCurrentPage('list');
   };
 
-  const handleThemeChange = (themeId) => {
-    setCurrentTheme(themeId);
-    saveTheme(themeId);
-    applyTheme(themeId);
-  };
 
   // Show loading state while checking authentication (with fallback)
   if (isLoadingAuth) {
@@ -463,6 +457,7 @@ function App() {
         onViewProfiles={handleViewProfiles}
         onCreateProfile={handleCreateProfile}
         onViewDashboard={handleViewDashboardFromHome}
+        onLogout={handleLogout}
         entities={entities}
       />
     );
@@ -489,7 +484,6 @@ function App() {
 
   return (
     <div className="App">
-      <ThemeSelector currentTheme={currentTheme} onThemeChange={handleThemeChange} />
       <ConfirmDialog
         isOpen={showConfirmDialog}
         title="Archive Profile"
@@ -531,7 +525,7 @@ function App() {
               className="nav-button"
               style={{ marginLeft: 'auto' }}
             >
-              Logout ({currentUser.email || currentUser.username})
+              Logout ({currentUser.username || currentUser.name || currentUser.email?.split('@')[0] || 'User'})
             </button>
           )}
         </nav>
@@ -567,6 +561,7 @@ function App() {
               onSave={handleEntitySaved}
               onCancel={handleBackToList}
               currentUser={currentUser}
+              onLogout={handleLogout}
             />
           </>
         )}
@@ -580,6 +575,8 @@ function App() {
                     onEdit={(entity) => handleEditEntity(entity)}
                     onDelete={handleDeleteEntity}
                     onViewDashboard={handleViewDashboard}
+                    onLogout={handleLogout}
+                    currentUser={currentUser}
                   />
                 )}
               </>
@@ -593,6 +590,8 @@ function App() {
                     onBack={() => {
                       setCurrentPage('view');
                     }}
+                    onLogout={handleLogout}
+                    currentUser={currentUser}
                   />
                 )}
               </>

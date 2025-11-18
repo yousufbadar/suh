@@ -2,6 +2,35 @@
   width: 100%;
 }
 
+.logout-container-form {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 20px;
+  padding: 10px 0;
+}
+
+.logout-button-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #e4405f 0%, #ff6b9d 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 700;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(228, 64, 95, 0.3);
+}
+
+.logout-button-form:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(228, 64, 95, 0.5);
+  background: linear-gradient(135deg, #ff6b9d 0%, #e4405f 100%);
+}
+
 .form-section {
   margin-bottom: 40px;
   padding-bottom: 30px;
@@ -146,11 +175,58 @@
   flex-direction: column;
 }
 
+.social-input-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  gap: 10px;
+}
+
 .social-input-wrapper label {
   font-weight: 600;
   color: #333;
-  margin-bottom: 6px;
   font-size: 0.9rem;
+  flex: 1;
+}
+
+.create-account-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: linear-gradient(135deg, #32cd32 0%, #28a745 100%);
+  color: white;
+  text-decoration: none;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  box-shadow: 0 2px 4px rgba(50, 205, 50, 0.2);
+}
+
+.create-account-link:hover {
+  background: linear-gradient(135deg, #28a745 0%, #32cd32 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(50, 205, 50, 0.3);
+}
+
+.create-account-link:active {
+  transform: translateY(0);
+}
+
+.create-account-icon {
+  font-size: 0.85rem;
+}
+
+.create-account-text {
+  font-size: 0.8rem;
+}
+
+.external-link-icon {
+  font-size: 0.7rem;
+  opacity: 0.9;
 }
 
 .social-input-wrapper input {
@@ -561,6 +637,22 @@
 
   .social-icon-wrapper {
     margin-bottom: 10px;
+  }
+
+  .social-input-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .create-account-link {
+    width: 100%;
+    justify-content: center;
+    padding: 8px 12px;
+  }
+
+  .create-account-text {
+    font-size: 0.75rem;
   }
 }
 

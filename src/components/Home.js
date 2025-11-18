@@ -1,20 +1,20 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import './Home.css';
-import { FaHeart, FaQrcode, FaShareAlt, FaUsers, FaRocket, FaSignInAlt, FaList, FaPlus, FaUser, FaChartBar, FaMousePointer } from 'react-icons/fa';
-import ThemeSelector from './ThemeSelector';
-import { getTheme, saveTheme, applyTheme } from '../utils/theme';
+import { FaHeart, FaQrcode, FaShareAlt, FaUsers, FaRocket, FaSignInAlt, FaList, FaPlus, FaUser, FaChartBar, FaMousePointer, FaSignOutAlt } from 'react-icons/fa';
+import { getTheme, applyTheme } from '../utils/theme';
 import { getEntityWithAnalytics } from '../utils/storage';
 
-function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProfile, onViewDashboard, entities }) {
-  const [currentTheme, setCurrentTheme] = useState(getTheme());
+function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProfile, onViewDashboard, onLogout, entities }) {
   const [summaryStats, setSummaryStats] = useState({ totalScans: 0, totalClicks: 0, totalProfiles: 0 });
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const isLoadingRef = useRef(false);
   const lastEntitiesRef = useRef(null);
 
+  // Apply theme on mount
   useEffect(() => {
-    applyTheme(currentTheme);
-  }, [currentTheme]);
+    const theme = getTheme();
+    applyTheme(theme);
+  }, []);
 
   // Log user state for debugging
   useEffect(() => {
@@ -124,11 +124,6 @@ function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProf
     loadSummaryStats();
   }, [currentUser, entitiesKey, entities]);
 
-  const handleThemeChange = (themeId) => {
-    setCurrentTheme(themeId);
-    saveTheme(themeId);
-    applyTheme(themeId);
-  };
 
   console.log('Home component rendering, onGetStarted:', typeof onGetStarted);
 
@@ -136,7 +131,13 @@ function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProf
   if (currentUser) {
     return (
       <div className="home-page">
-        <ThemeSelector currentTheme={currentTheme} onThemeChange={handleThemeChange} />
+        {onLogout && (
+          <div className="logout-container-home">
+            <button onClick={onLogout} className="logout-button-home" title="Logout">
+              <FaSignOutAlt /> Logout ({currentUser.username || currentUser.name || currentUser.email?.split('@')[0] || 'User'})
+            </button>
+          </div>
+        )}
         <div className="home-hero">
           <div className="hero-content">
             <div className="hero-icon-wrapper">
@@ -148,7 +149,7 @@ function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProf
               <div className="floating-emoji delay-2">🔥</div>
             </div>
             <h1 className="hero-title">
-              Welcome back, <span className="gradient-text">{currentUser.username || currentUser.email?.split('@')[0]}</span>! 👋
+              Welcome back, <span className="gradient-text">{currentUser.username || currentUser.name || currentUser.email?.split('@')[0] || 'User'}</span>! 👋
             </h1>
             <p className="hero-subtitle">
               Manage your profiles and connect with your audience
@@ -287,7 +288,6 @@ function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProf
   // Original landing page for non-logged-in users
   return (
     <div className="home-page">
-      <ThemeSelector currentTheme={currentTheme} onThemeChange={handleThemeChange} />
       <div className="home-hero">
         <div className="hero-content">
           <div className="hero-icon-wrapper">

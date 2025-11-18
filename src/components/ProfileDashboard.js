@@ -19,9 +19,10 @@ import {
   FaMousePointer,
   FaChevronLeft,
   FaChevronRight,
+  FaSignOutAlt,
 } from 'react-icons/fa';
 
-function ProfileDashboard({ entityId, onBack }) {
+function ProfileDashboard({ entityId, onBack, onLogout, currentUser }) {
   const [entity, setEntity] = useState(null);
   const [summaryStats, setSummaryStats] = useState(null);
   const [minuteData, setMinuteData] = useState([]);
@@ -164,6 +165,13 @@ function ProfileDashboard({ entityId, onBack }) {
 
   return (
     <div className="profile-dashboard">
+      {onLogout && currentUser && (
+        <div className="logout-container-dashboard">
+          <button onClick={onLogout} className="logout-button-dashboard" title="Logout">
+            <FaSignOutAlt /> Logout ({currentUser.username || currentUser.name || currentUser.email?.split('@')[0] || 'User'})
+          </button>
+        </div>
+      )}
       <div className="dashboard-header">
         <button onClick={onBack} className="back-button">
           <FaArrowLeft /> Back

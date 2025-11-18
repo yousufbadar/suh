@@ -1,8 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import './SocialMediaIconsPage.css';
 import { getEntityByUUID, trackQRScan, trackSocialClick, trackCustomLinkClick } from '../utils/storage';
-import ThemeSelector from './ThemeSelector';
-import { getTheme, saveTheme, applyTheme } from '../utils/theme';
+import { getTheme, applyTheme } from '../utils/theme';
 import {
   FaFacebook,
   FaTwitter,
@@ -50,7 +49,6 @@ function SocialMediaIconsPage({ uuid }) {
   const [entity, setEntity] = useState(null);
   const [loading, setLoading] = useState(true);
   const hasTracked = useRef(false);
-  const [currentTheme, setCurrentTheme] = useState(getTheme());
 
   // Apply theme on mount
   useEffect(() => {
@@ -58,16 +56,6 @@ function SocialMediaIconsPage({ uuid }) {
     applyTheme(theme);
   }, []);
 
-  // Apply theme when it changes
-  useEffect(() => {
-    applyTheme(currentTheme);
-  }, [currentTheme]);
-
-  const handleThemeChange = (themeId) => {
-    setCurrentTheme(themeId);
-    saveTheme(themeId);
-    applyTheme(themeId);
-  };
 
   useEffect(() => {
     const loadEntity = async () => {
@@ -136,7 +124,6 @@ function SocialMediaIconsPage({ uuid }) {
   if (loading) {
     return (
       <div className="social-icons-page">
-        <ThemeSelector currentTheme={currentTheme} onThemeChange={handleThemeChange} />
         <div className="loading-container">
           <FaSpinner className="spinner" />
           <p>Loading...</p>
@@ -148,7 +135,6 @@ function SocialMediaIconsPage({ uuid }) {
   if (!entity) {
     return (
       <div className="social-icons-page">
-        <ThemeSelector currentTheme={currentTheme} onThemeChange={handleThemeChange} />
             <div className="error-container">
               <h1>Profile Not Found</h1>
               <p>The QR code is invalid or the profile has been removed.</p>
@@ -163,7 +149,6 @@ function SocialMediaIconsPage({ uuid }) {
   if (socialMediaLinks.length === 0 && customLinks.length === 0) {
     return (
       <div className="social-icons-page">
-        <ThemeSelector currentTheme={currentTheme} onThemeChange={handleThemeChange} />
         <div className="social-icons-container">
           <p className="no-links-message">No links available for this profile.</p>
         </div>
@@ -173,7 +158,6 @@ function SocialMediaIconsPage({ uuid }) {
 
   return (
     <div className="social-icons-page">
-      <ThemeSelector currentTheme={currentTheme} onThemeChange={handleThemeChange} />
       <div className="social-icons-container">
         <div className="company-header">
           {entity.logo && (

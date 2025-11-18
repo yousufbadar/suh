@@ -1,5 +1,35 @@
 .entity-view {
   width: 100%;
+  position: relative;
+}
+
+.logout-container-view {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 20px;
+  padding: 10px 0;
+}
+
+.logout-button-view {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #e4405f 0%, #ff6b9d 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 700;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(228, 64, 95, 0.3);
+}
+
+.logout-button-view:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(228, 64, 95, 0.5);
+  background: linear-gradient(135deg, #ff6b9d 0%, #e4405f 100%);
 }
 
 .entity-view-empty {
