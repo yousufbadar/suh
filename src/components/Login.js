@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import './Login.css';
 import { loginUser, registerUser } from '../utils/auth';
-import { FaGoogle, FaFacebook, FaTwitter, FaLock, FaUser, FaEnvelope } from 'react-icons/fa';
+import { FaGoogle, FaLock, FaUser, FaEnvelope } from 'react-icons/fa';
 
 function Login({ onLoginSuccess, onClose }) {
   const [isLogin, setIsLogin] = useState(true);
@@ -145,14 +145,29 @@ function Login({ onLoginSuccess, onClose }) {
   };
 
   const handleSSO = async (provider) => {
-    // Note: In a real application, you would use proper OAuth libraries
-    // This is a simplified version that would need backend integration
-    setGeneralError(`${provider} SSO integration requires backend setup. This is a placeholder.`);
-    
-    // Example of what the integration would look like:
-    // For Google: window.location.href = `/api/auth/google`
-    // For Facebook: window.location.href = `/api/auth/facebook`
-    // For Twitter: window.location.href = `/api/auth/twitter`
+    try {
+      setIsLoading(true);
+      setGeneralError('');
+      setErrors({});
+      
+      console.log(`🔐 Attempting ${provider} SSO login...`);
+      
+      // Import ssoLogin function
+      const { ssoLogin } = await import('../utils/auth');
+      
+      // Initiate OAuth flow
+      await ssoLogin(provider.toLowerCase());
+      
+      // Note: The user will be redirected to the OAuth provider
+      // After authentication, they'll be redirected back to the app
+      // The auth state change listener in App.js will handle the session
+      
+    } catch (error) {
+      console.error(`❌ ${provider} SSO error:`, error);
+      const errorMessage = error.message || `${provider} login failed. Please try again.`;
+      setGeneralError(errorMessage);
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -287,25 +302,10 @@ function Login({ onLoginSuccess, onClose }) {
             type="button"
             className="sso-button google"
             onClick={() => handleSSO('google')}
+            disabled={isLoading}
           >
             <FaGoogle />
             <span>Google</span>
-          </button>
-          <button
-            type="button"
-            className="sso-button facebook"
-            onClick={() => handleSSO('facebook')}
-          >
-            <FaFacebook />
-            <span>Facebook</span>
-          </button>
-          <button
-            type="button"
-            className="sso-button twitter"
-            onClick={() => handleSSO('twitter')}
-          >
-            <FaTwitter />
-            <span>Twitter</span>
           </button>
         </div>
 

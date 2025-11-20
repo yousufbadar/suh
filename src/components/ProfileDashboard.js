@@ -20,6 +20,7 @@ import {
   FaChevronLeft,
   FaChevronRight,
   FaSignOutAlt,
+  FaSync,
 } from 'react-icons/fa';
 
 function ProfileDashboard({ entityId, onBack, onLogout, currentUser }) {
@@ -73,27 +74,23 @@ function ProfileDashboard({ entityId, onBack, onLogout, currentUser }) {
     loadEntityData();
   }, [entityId, dayOffset, minuteOffset, hourOffset]);
 
-  // Refresh data periodically
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      if (entityId) {
-        try {
-          const loadedEntity = await getEntityWithAnalytics(entityId);
-          if (loadedEntity) {
-            setEntity(loadedEntity);
-            setSummaryStats(getSummaryStats(loadedEntity));
-            setMinuteData(await getClicksByMinuteDirect(loadedEntity.id, loadedEntity.uuid, 30, minuteOffset));
-            setHourData(await getClicksByHourDirect(loadedEntity.id, loadedEntity.uuid, 12, hourOffset));
-            setDayDataWithBreakdown(await getClicksByDayDirect(loadedEntity.id, loadedEntity.uuid, 7, dayOffset));
-          }
-        } catch (error) {
-          console.error('Error refreshing entity data:', error);
-        }
+  // Manual refresh function (auto-refresh disabled to minimize egress)
+  const handleManualRefresh = async () => {
+    if (!entityId) return;
+    
+    try {
+      const loadedEntity = await getEntityWithAnalytics(entityId);
+      if (loadedEntity) {
+        setEntity(loadedEntity);
+        setSummaryStats(getSummaryStats(loadedEntity));
+        setMinuteData(await getClicksByMinuteDirect(loadedEntity.id, loadedEntity.uuid, 30, minuteOffset));
+        setHourData(await getClicksByHourDirect(loadedEntity.id, loadedEntity.uuid, 12, hourOffset));
+        setDayDataWithBreakdown(await getClicksByDayDirect(loadedEntity.id, loadedEntity.uuid, 7, dayOffset));
       }
-    }, 30000); // Refresh every 30 seconds
-
-    return () => clearInterval(interval);
-  }, [entityId, dayOffset, minuteOffset, hourOffset]);
+    } catch (error) {
+      console.error('Error refreshing entity data:', error);
+    }
+  };
 
   if (!entity) {
     return (
@@ -175,6 +172,9 @@ function ProfileDashboard({ entityId, onBack, onLogout, currentUser }) {
       <div className="dashboard-header">
         <button onClick={onBack} className="back-button">
           <FaArrowLeft /> Back
+        </button>
+        <button onClick={handleManualRefresh} className="refresh-button" title="Refresh data">
+          <FaSync /> Refresh
         </button>
         <div className="dashboard-title-section">
           {entity.logo && (

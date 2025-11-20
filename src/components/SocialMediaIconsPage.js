@@ -93,14 +93,9 @@ function SocialMediaIconsPage({ uuid }) {
       return;
     }
 
-    // Track the click
-    await trackSocialClick(entityId, platform);
-    // Reload entity data to reflect updated click count
-    const updatedEntity = await getEntityByUUID(uuid);
-    if (updatedEntity) {
-      setEntity(updatedEntity);
-    }
-    // Open in new tab
+    // Track the click (optimized: skip reload to reduce egress)
+    trackSocialClick(entityId, platform).catch(err => console.error('Error tracking click:', err));
+    // Open in new tab immediately
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
@@ -110,14 +105,9 @@ function SocialMediaIconsPage({ uuid }) {
       return;
     }
 
-    // Track the click
-    await trackCustomLinkClick(entityId, customLinkIndex);
-    // Reload entity data to reflect updated click count
-    const updatedEntity = await getEntityByUUID(uuid);
-    if (updatedEntity) {
-      setEntity(updatedEntity);
-    }
-    // Open in new tab
+    // Track the click (optimized: skip reload to reduce egress)
+    trackCustomLinkClick(entityId, customLinkIndex).catch(err => console.error('Error tracking click:', err));
+    // Open in new tab immediately
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 

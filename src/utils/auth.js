@@ -28,10 +28,15 @@ export const registerUser = async (email, password, username) => {
     throw new Error(error.message || 'Registration failed');
   }
   
+  // Extract username/name from user metadata
+  const extractedUsername = data.user?.user_metadata?.username || username || email.split('@')[0];
+  const extractedName = data.user?.user_metadata?.full_name || data.user?.user_metadata?.name || extractedUsername;
+
   return {
     id: data.user?.id,
     email: data.user?.email,
-    username: data.user?.user_metadata?.username || email.split('@')[0]
+    username: extractedUsername,
+    name: extractedName
   };
 };
 
@@ -83,10 +88,17 @@ export const loginUser = async (email, password) => {
 
     console.log('✅ Login successful for:', data.user.email);
     
+    // Extract username/name from user metadata
+    const username = data.user.user_metadata?.username || 
+                     data.user.user_metadata?.full_name || 
+                     data.user.user_metadata?.name ||
+                     email.split('@')[0];
+
     const user = {
       id: data.user.id,
       email: data.user.email,
-      username: data.user.user_metadata?.username || email.split('@')[0]
+      username: username,
+      name: data.user.user_metadata?.full_name || data.user.user_metadata?.name || username
     };
     
     // Verify session was created
@@ -144,10 +156,18 @@ export const getCurrentUser = async () => {
       return null;
     }
 
+    // Extract username/name from user metadata (OAuth providers may use different fields)
+    const username = user.user_metadata?.username || 
+                     user.user_metadata?.full_name || 
+                     user.user_metadata?.name ||
+                     user.user_metadata?.preferred_username ||
+                     user.email?.split('@')[0];
+
     return {
       id: user.id,
       email: user.email,
-      username: user.user_metadata?.username || user.email?.split('@')[0]
+      username: username,
+      name: user.user_metadata?.full_name || user.user_metadata?.name || user.user_metadata?.preferred_username || username
     };
   } catch (error) {
     console.error('❌ Unexpected error getting current user:', error);
@@ -171,19 +191,51 @@ export const getUserById = async (userId) => {
   return user;
 };
 
-// SSO Login (for future implementation)
+// SSO Login with OAuth providers
 export const ssoLogin = async (provider) => {
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: provider,
-    options: {
-      redirectTo: `${window.location.origin}/auth/callback`
-    }
-  });
-
-  if (error) {
-    throw new Error(error.message || 'SSO login failed');
-  }
+  // Validate provider
+  const validProviders = ['google', 'facebook', 'twitter', 'github', 'discord', 'azure', 'apple'];
+  const normalizedProvider = provider.toLowerCase();
   
-  return data;
+  if (!validProviders.includes(normalizedProvider)) {
+    throw new Error(`Unsupported provider: ${provider}. Supported providers: ${validProviders.join(', ')}`);
+  }
+
+  // Check if Supabase client is properly configured
+  if (!supabase || !supabase.auth) {
+    console.error('❌ Supabase client is not properly initialized');
+    throw new Error('Database connection error. Please check your configuration and restart the server.');
+  }
+
+  try {
+    console.log(`🔐 Initiating ${normalizedProvider} OAuth flow...`);
+    
+    // Get the current URL for redirect
+    const redirectUrl = `${window.location.origin}${window.location.pathname}`;
+    
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: normalizedProvider,
+      options: {
+        redirectTo: redirectUrl,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
+      },
+    });
+
+    if (error) {
+      console.error(`❌ ${normalizedProvider} OAuth error:`, error);
+      throw new Error(error.message || `${provider} login failed`);
+    }
+
+    // OAuth flow will redirect the user, so we don't need to return anything
+    // The redirect will happen automatically
+    console.log(`✅ ${normalizedProvider} OAuth flow initiated, redirecting...`);
+    return data;
+  } catch (error) {
+    console.error(`❌ ${normalizedProvider} SSO failed:`, error);
+    throw error;
+  }
 };
 

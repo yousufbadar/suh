@@ -78,6 +78,32 @@
   margin: 5px 0 0 0;
 }
 
+.refresh-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #32cd32 0%, #28a745 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(50, 205, 50, 0.3);
+}
+
+.refresh-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(50, 205, 50, 0.4);
+  background: linear-gradient(135deg, #28a745 0%, #32cd32 100%);
+}
+
+.refresh-button:active {
+  transform: translateY(0);
+}
+
 .back-button {
   display: flex;
   align-items: center;

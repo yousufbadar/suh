@@ -794,12 +794,12 @@ export const getClicksByMinuteDirect = async (entityId, uuid, minutes = 30, offs
       return `${year}-${month}-${day}`;
     };
     
-    // Query a wider date range to ensure we get all data (2 days before to 2 days after)
-    // This handles cases where clicks might be from a different day due to timezone or date changes
+    // Query a slightly wider date range (1 day before to 1 day after) to handle timezone edge cases
+    // Reduced from 2 days to minimize egress
     const queryStartDate = new Date(startDateLocal);
-    queryStartDate.setDate(queryStartDate.getDate() - 2);
+    queryStartDate.setDate(queryStartDate.getDate() - 1);
     const queryEndDate = new Date(endDateLocal);
-    queryEndDate.setDate(queryEndDate.getDate() + 2);
+    queryEndDate.setDate(queryEndDate.getDate() + 1);
     
     const queryStartDateStr = getLocalDateStr(queryStartDate);
     const queryEndDateStr = getLocalDateStr(queryEndDate);

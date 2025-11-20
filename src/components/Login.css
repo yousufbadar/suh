@@ -243,23 +243,6 @@
   background: #fce8e6;
 }
 
-.sso-button.facebook {
-  color: #1877f2;
-  border-color: #1877f2;
-}
-
-.sso-button.facebook:hover {
-  background: #e7f3ff;
-}
-
-.sso-button.twitter {
-  color: #1da1f2;
-  border-color: #1da1f2;
-}
-
-.sso-button.twitter:hover {
-  background: #e6f4fb;
-}
 
 .sso-button svg {
   font-size: 1.2rem;

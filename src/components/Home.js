@@ -32,7 +32,7 @@ function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProf
       .join(',');
   }, [entities]);
 
-  // Load summary statistics for all profiles
+  // Load summary statistics for all profiles (with caching to reduce egress)
   useEffect(() => {
     const loadSummaryStats = async () => {
       // Prevent multiple simultaneous loads
@@ -54,6 +54,24 @@ function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProf
         return;
       }
 
+      // Check cache (5 minute TTL to reduce egress)
+      const cacheKey = `home_stats_${currentUser.id}_${entitiesKey}`;
+      const cached = sessionStorage.getItem(cacheKey);
+      if (cached) {
+        try {
+          const { stats, timestamp } = JSON.parse(cached);
+          const age = Date.now() - timestamp;
+          if (age < 300000) { // 5 minutes
+            console.log('📊 Using cached home stats');
+            setSummaryStats(stats);
+            lastEntitiesRef.current = entitiesKey;
+            return;
+        }
+        } catch (e) {
+          // Invalid cache, continue to load
+        }
+      }
+
       isLoadingRef.current = true;
       setIsLoadingStats(true);
       
@@ -61,6 +79,15 @@ function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProf
         let totalScans = 0;
         let totalClicks = 0;
         const activeProfiles = entities.filter(e => e.active !== false);
+
+        // Only load analytics if we have profiles (optimized: skip if no profiles)
+        if (activeProfiles.length === 0) {
+          const newStats = { totalScans: 0, totalClicks: 0, totalProfiles: 0 };
+          setSummaryStats(newStats);
+          sessionStorage.setItem(cacheKey, JSON.stringify({ stats: newStats, timestamp: Date.now() }));
+          lastEntitiesRef.current = entitiesKey;
+          return;
+        }
 
         // Load analytics for each profile in parallel for better performance
         const analyticsPromises = activeProfiles.map(entity => getEntityWithAnalytics(entity.id));
@@ -98,6 +125,9 @@ function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProf
           totalClicks,
           totalProfiles: activeProfiles.length
         };
+
+        // Cache the results
+        sessionStorage.setItem(cacheKey, JSON.stringify({ stats: newStats, timestamp: Date.now() }));
 
         // Only update if stats actually changed
         setSummaryStats(prevStats => {
@@ -149,7 +179,8 @@ function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProf
               <div className="floating-emoji delay-2">🔥</div>
             </div>
             <h1 className="hero-title">
-              Welcome back, <span className="gradient-text">{currentUser.username || currentUser.name || currentUser.email?.split('@')[0] || 'User'}</span>! 👋
+              Welcome back,<br />
+              <span className="gradient-text">{currentUser.name || currentUser.username || (currentUser.email ? currentUser.email.split('@')[0] : 'User')}</span>! 👋
             </h1>
             <p className="hero-subtitle">
               Manage your profiles and connect with your audience

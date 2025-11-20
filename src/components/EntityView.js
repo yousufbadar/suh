@@ -164,14 +164,9 @@ function EntityView({ entity, onBack, onEdit, onDelete, onViewDashboard, onLogou
       return;
     }
 
-    // Track the click
-    await trackSocialClick(entityId, platform);
-    // Reload entity data with analytics to reflect updated click count
-    const updatedEntity = await getEntityWithAnalytics(entityId);
-    if (updatedEntity) {
-      setCurrentEntity(updatedEntity);
-    }
-    // Open in new tab
+    // Track the click (don't reload - dashboard will refresh automatically)
+    trackSocialClick(entityId, platform).catch(err => console.error('Error tracking click:', err));
+    // Open in new tab immediately (optimized: skip reload to reduce egress)
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
@@ -182,13 +177,8 @@ function EntityView({ entity, onBack, onEdit, onDelete, onViewDashboard, onLogou
       return;
     }
 
-    // Track the click
-    await trackCustomLinkClick(entityId, customLinkIndex);
-    // Reload entity data with analytics to reflect updated click count
-    const updatedEntity = await getEntityWithAnalytics(entityId);
-    if (updatedEntity) {
-      setCurrentEntity(updatedEntity);
-    }
+    // Track the click (don't reload - dashboard will refresh automatically)
+    trackCustomLinkClick(entityId, customLinkIndex).catch(err => console.error('Error tracking click:', err));
     // Open in new tab
     window.open(url, '_blank', 'noopener,noreferrer');
   };
