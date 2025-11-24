@@ -45,6 +45,7 @@ export const sanitizeUrl = (url) => {
     const urlObj = new URL(url);
     
     // Block dangerous protocols
+    // eslint-disable-next-line no-script-url
     const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:', 'about:'];
     const protocol = urlObj.protocol.toLowerCase().replace(':', '');
     
@@ -76,7 +77,7 @@ export const validateEmail = (email) => {
   if (email.length > 254) return false; // RFC 5321 limit
   
   // Check for dangerous characters
-  if (/[<>\"'`]/.test(email)) return false;
+  if (/[<>"'`]/.test(email)) return false;
   
   // Check for multiple @ symbols
   const atCount = (email.match(/@/g) || []).length;
@@ -99,15 +100,15 @@ export const validateEmail = (email) => {
  * Validate phone number format
  */
 export const validatePhone = (phone) => {
-  if (!phone || typeof phone === 'string' && phone.trim() === '') return true; // Optional field
+  if (!phone || (typeof phone === 'string' && phone.trim() === '')) return true; // Optional field
   
   if (typeof phone !== 'string') return false;
-  
+
   // Remove common formatting characters
-  const cleaned = phone.replace(/[\s\-\(\)\+\.]/g, '');
-  
+  const cleaned = phone.replace(/[\s\-()+.]/g, '');
+
   // Check if contains only digits and allowed characters
-  if (!/^[\d\s\-\(\)\+\.]+$/.test(phone)) return false;
+  if (!/^[\d\s\-()+.]+$/.test(phone)) return false;
   
   // Length validation (5-20 digits)
   const digitsOnly = cleaned.replace(/\D/g, '');
@@ -194,7 +195,7 @@ export const sanitizeEntityName = (name) => {
   let sanitized = sanitizeText(name);
   
   // Remove potentially dangerous characters but keep spaces and common punctuation
-  sanitized = sanitized.replace(/[<>\"'`\{\}\[\]\\]/g, '');
+  sanitized = sanitized.replace(/[<>"'`{}[\]\\]/g, '');
   
   // Limit length
   sanitized = sanitized.substring(0, 100).trim();

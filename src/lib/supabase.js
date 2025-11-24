@@ -64,7 +64,7 @@ export const testConnection = async () => {
 
   try {
     // Simple query to test connection
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('profiles')
       .select('id')
       .limit(1);

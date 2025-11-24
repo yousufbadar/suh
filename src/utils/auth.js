@@ -124,8 +124,13 @@ export const logoutUser = async () => {
   }
 };
 
-// Get current user
-export const getCurrentUser = async () => {
+// Cache for getCurrentUser to limit API calls to once per minute
+let lastGetUserCall = null;
+let cachedUserResult = null;
+const GET_USER_CACHE_DURATION = 60000; // 60 seconds (1 minute)
+
+// Get current user (rate limited to once per minute)
+export const getCurrentUser = async (forceRefresh = false) => {
   try {
     // Check if Supabase client is properly configured
     if (!supabase || !supabase.auth) {
@@ -133,26 +138,44 @@ export const getCurrentUser = async () => {
       return null;
     }
 
+    // Check cache first (unless force refresh is requested)
+    const now = Date.now();
+    if (!forceRefresh && lastGetUserCall && cachedUserResult !== null) {
+      const timeSinceLastCall = now - lastGetUserCall;
+      if (timeSinceLastCall < GET_USER_CACHE_DURATION) {
+        console.log(`📦 Using cached user data (${Math.round((GET_USER_CACHE_DURATION - timeSinceLastCall) / 1000)}s remaining)`);
+        return cachedUserResult;
+      }
+    }
+
     // First check session
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     if (sessionError) {
       console.error('❌ Error getting session:', sessionError);
+      lastGetUserCall = now;
+      cachedUserResult = null;
       return null;
     }
 
     if (!session) {
       console.log('ℹ️  No active session found');
+      lastGetUserCall = now;
+      cachedUserResult = null;
       return null;
     }
 
-    // Then get user
+    // Then get user (this is the API call we want to limit)
     const { data: { user }, error } = await supabase.auth.getUser();
     if (error) {
       console.error('❌ Error getting current user:', error);
+      lastGetUserCall = now;
+      cachedUserResult = null;
       return null;
     }
     
     if (!user) {
+      lastGetUserCall = now;
+      cachedUserResult = null;
       return null;
     }
 
@@ -163,14 +186,23 @@ export const getCurrentUser = async () => {
                      user.user_metadata?.preferred_username ||
                      user.email?.split('@')[0];
 
-    return {
+    const userData = {
       id: user.id,
       email: user.email,
       username: username,
       name: user.user_metadata?.full_name || user.user_metadata?.name || user.user_metadata?.preferred_username || username
     };
+
+    // Cache the result
+    lastGetUserCall = now;
+    cachedUserResult = userData;
+    console.log('✅ User data fetched and cached');
+
+    return userData;
   } catch (error) {
     console.error('❌ Unexpected error getting current user:', error);
+    lastGetUserCall = Date.now();
+    cachedUserResult = null;
     return null;
   }
 };

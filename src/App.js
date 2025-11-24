@@ -119,7 +119,8 @@ function App() {
                 
                 if (session) {
                   console.log('✅ Session found, getting user...');
-                  const user = await getCurrentUser();
+                  // Only force refresh on SIGNED_IN event, otherwise use cache (max once per minute)
+                  const user = await getCurrentUser(event === 'SIGNED_IN');
                   if (user) {
                     console.log('✅ User retrieved:', user.email);
                     // If user just logged in (SIGNED_IN event), navigate to home
@@ -235,7 +236,7 @@ function App() {
 
   const checkAuth = async () => {
     try {
-      const user = await getCurrentUser();
+      const user = await getCurrentUser(false); // Use cache if available (respects 1 minute limit)
       setCurrentUser(user);
       // Don't set showLogin here - let the render logic handle it based on currentPage
       setShowLogin(false);

@@ -1,6 +1,6 @@
 import React from 'react';
 import './ConfirmDialog.css';
-import { FaExclamationTriangle, FaTimes } from 'react-icons/fa';
+import { FaExclamationTriangle } from 'react-icons/fa';
 
 function ConfirmDialog({ isOpen, title, message, onConfirm, onCancel, confirmText = 'Confirm', cancelText = 'Cancel', type = 'warning' }) {
   if (!isOpen) return null;
