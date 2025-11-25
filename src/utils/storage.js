@@ -764,6 +764,127 @@ export const trackCustomLinkClick = async (entityId, customLinkIndex) => {
   }
 };
 
+// Query cache to avoid duplicate API calls
+const queryCache = new Map();
+const inFlightRequests = new Map(); // Track in-flight requests to prevent duplicates
+const CACHE_TTL = 30000; // 30 seconds cache
+
+// Helper to get cache key
+const getCacheKey = (entityId, uuid, startDate, endDate) => {
+  return `${entityId}_${uuid}_${startDate}_${endDate}`;
+};
+
+// Unified function to fetch all click data for a date range (with caching and request deduplication)
+const fetchAllClickData = async (entityId, uuid, startDateStr, endDateStr) => {
+  const cacheKey = getCacheKey(entityId, uuid, startDateStr, endDateStr);
+  
+  // Check cache first - also check for overlapping date ranges
+  const cached = queryCache.get(cacheKey);
+  if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
+    console.log('📦 Using cached click data for:', cacheKey);
+    return cached.data;
+  }
+  
+  // Check for overlapping cached data (if requested range is within a cached range)
+  for (const [key, value] of queryCache.entries()) {
+    if ((Date.now() - value.timestamp) < CACHE_TTL) {
+      const [cachedEntityId, cachedUuid, cachedStart, cachedEnd] = key.split('_');
+      if (cachedEntityId === entityId && cachedUuid === uuid) {
+        // Check if requested range is within cached range
+        if (startDateStr >= cachedStart && endDateStr <= cachedEnd) {
+          console.log('📦 Using overlapping cached data:', { requested: `${startDateStr} to ${endDateStr}`, cached: `${cachedStart} to ${cachedEnd}` });
+          // Filter the cached data to the requested range
+          const filtered = {
+            social: (value.data.social || []).filter(row => row.click_date >= startDateStr && row.click_date <= endDateStr),
+            custom: (value.data.custom || []).filter(row => row.click_date >= startDateStr && row.click_date <= endDateStr),
+            qr: (value.data.qr || []).filter(row => row.click_date >= startDateStr && row.click_date <= endDateStr),
+          };
+          return filtered;
+        }
+      }
+    }
+  }
+  
+  // Check if there's already an in-flight request for this key
+  const inFlight = inFlightRequests.get(cacheKey);
+  if (inFlight) {
+    console.log('⏳ Waiting for in-flight request:', cacheKey);
+    // Wait for the existing request to complete
+    try {
+      const result = await inFlight;
+      // Filter to requested range if the in-flight request had a wider range
+      return result;
+    } catch (error) {
+      // If the in-flight request failed, we'll retry below
+      console.warn('⚠️ In-flight request failed, retrying:', error);
+    }
+  }
+  
+  // Create a new request promise
+  console.log('🔍 Fetching click data from database:', { entityId, uuid, startDateStr, endDateStr, cacheKey });
+  
+  const requestPromise = (async () => {
+    try {
+      // Fetch all columns needed for all granularities in one query per table
+      const [socialResult, customResult, qrResult] = await Promise.all([
+        supabase.from('social_clicks_by_minute')
+          .select('click_date, click_hour, click_minute, platform, click_count')
+          .eq('profile_id', entityId)
+          .gte('click_date', startDateStr)
+          .lte('click_date', endDateStr),
+        supabase.from('custom_link_clicks_by_minute')
+          .select('click_date, click_hour, click_minute, link_index, click_count')
+          .eq('profile_id', entityId)
+          .gte('click_date', startDateStr)
+          .lte('click_date', endDateStr),
+        supabase.from('qr_scans_by_minute')
+          .select('click_date, click_hour, click_minute, click_count')
+          .eq('profile_uuid', uuid)
+          .gte('click_date', startDateStr)
+          .lte('click_date', endDateStr),
+      ]);
+      
+      const { data: socialData, error: socialError } = socialResult;
+      const { data: customData, error: customError } = customResult;
+      const { data: qrData, error: qrError } = qrResult;
+      
+      if (socialError) console.error('❌ Error querying social clicks:', socialError);
+      if (customError) console.error('❌ Error querying custom link clicks:', customError);
+      if (qrError) console.error('❌ Error querying QR scans:', qrError);
+      
+      const result = {
+        social: socialData || [],
+        custom: customData || [],
+        qr: qrData || [],
+      };
+      
+      // Cache the result
+      queryCache.set(cacheKey, {
+        data: result,
+        timestamp: Date.now(),
+      });
+      
+      // Clean up old cache entries (keep only last 10)
+      if (queryCache.size > 10) {
+        const entries = Array.from(queryCache.entries());
+        entries.sort((a, b) => b[1].timestamp - a[1].timestamp);
+        queryCache.clear();
+        entries.slice(0, 10).forEach(([key, value]) => queryCache.set(key, value));
+      }
+      
+      return result;
+    } finally {
+      // Remove from in-flight requests when done
+      inFlightRequests.delete(cacheKey);
+    }
+  })();
+  
+  // Store the in-flight request
+  inFlightRequests.set(cacheKey, requestPromise);
+  
+  return await requestPromise;
+};
+
 // Direct query functions for dashboard charts (bypass timestamp reconstruction)
 export const getClicksByMinuteDirect = async (entityId, uuid, minutes = 30, offsetMinutes = 0) => {
   try {
@@ -771,22 +892,7 @@ export const getClicksByMinuteDirect = async (entityId, uuid, minutes = 30, offs
     const endTime = new Date(now.getTime() - offsetMinutes * 60 * 1000);
     const startTime = new Date(endTime.getTime() - minutes * 60 * 1000);
     
-    console.log('⏰ Time range calculation:', {
-      now: now.toLocaleString(),
-      nowISO: now.toISOString(),
-      offsetMinutes,
-      endTime: endTime.toLocaleString(),
-      endTimeISO: endTime.toISOString(),
-      startTime: startTime.toLocaleString(),
-      startTimeISO: startTime.toISOString(),
-      minutes,
-    });
-    
     // Get local date strings (not UTC) to match how data is stored
-    const startDateLocal = new Date(startTime);
-    const endDateLocal = new Date(endTime);
-    
-    // Get date strings in local timezone (YYYY-MM-DD)
     const getLocalDateStr = (date) => {
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -795,50 +901,21 @@ export const getClicksByMinuteDirect = async (entityId, uuid, minutes = 30, offs
     };
     
     // Query a slightly wider date range (1 day before to 1 day after) to handle timezone edge cases
-    // Reduced from 2 days to minimize egress
-    const queryStartDate = new Date(startDateLocal);
+    const queryStartDate = new Date(startTime);
     queryStartDate.setDate(queryStartDate.getDate() - 1);
-    const queryEndDate = new Date(endDateLocal);
+    const queryEndDate = new Date(endTime);
     queryEndDate.setDate(queryEndDate.getDate() + 1);
     
     const queryStartDateStr = getLocalDateStr(queryStartDate);
     const queryEndDateStr = getLocalDateStr(queryEndDate);
     
-    console.log('🔍 Querying minute data:', {
-      startTime: startTime.toLocaleString(),
-      endTime: endTime.toLocaleString(),
-      queryStartDate: queryStartDateStr,
-      queryEndDate: queryEndDateStr,
+    // Use unified fetch function with caching
+    const { social: socialData, custom: customData, qr: qrData } = await fetchAllClickData(
       entityId,
       uuid,
-    });
-    
-    // Query all three tables in parallel - get wider date range
-    const [socialResult, customResult, qrResult] = await Promise.all([
-      supabase.from('social_clicks_by_minute')
-        .select('click_date, click_hour, click_minute, platform, click_count')
-        .eq('profile_id', entityId)
-        .gte('click_date', queryStartDateStr)
-        .lte('click_date', queryEndDateStr),
-      supabase.from('custom_link_clicks_by_minute')
-        .select('click_date, click_hour, click_minute, link_index, click_count')
-        .eq('profile_id', entityId)
-        .gte('click_date', queryStartDateStr)
-        .lte('click_date', queryEndDateStr),
-      supabase.from('qr_scans_by_minute')
-        .select('click_date, click_hour, click_minute, click_count')
-        .eq('profile_uuid', uuid)
-        .gte('click_date', queryStartDateStr)
-        .lte('click_date', queryEndDateStr),
-    ]);
-    
-    const { data: socialData, error: socialError } = socialResult;
-    const { data: customData, error: customError } = customResult;
-    const { data: qrData, error: qrError } = qrResult;
-    
-    if (socialError) console.error('❌ Error querying social clicks:', socialError);
-    if (customError) console.error('❌ Error querying custom link clicks:', customError);
-    if (qrError) console.error('❌ Error querying QR scans:', qrError);
+      queryStartDateStr,
+      queryEndDateStr
+    );
     
     // Helper to create date in local timezone
     const createLocalDate = (dateStr, hour, minute) => {
@@ -1011,18 +1088,8 @@ export const getClicksByMinuteDirect = async (entityId, uuid, minutes = 30, offs
 export const getClicksByHourDirect = async (entityId, uuid, hours = 12, hourOffset = 0) => {
   try {
     const now = new Date();
-    
-    // Calculate the end time (now - hourOffset hours)
     const endTime = new Date(now.getTime() - hourOffset * 60 * 60 * 1000);
-    
-    // Calculate the start time (hours before endTime)
     const startTime = new Date(endTime.getTime() - hours * 60 * 60 * 1000);
-    
-    // Get date range for querying (wider range to ensure we get all data)
-    const queryStartDate = new Date(startTime);
-    queryStartDate.setDate(queryStartDate.getDate() - 1); // Go back 1 day
-    const queryEndDate = new Date(endTime);
-    queryEndDate.setDate(queryEndDate.getDate() + 1); // Go forward 1 day
     
     // Get local date strings (not UTC) to match how data is stored
     const getLocalDateStr = (date) => {
@@ -1032,46 +1099,22 @@ export const getClicksByHourDirect = async (entityId, uuid, hours = 12, hourOffs
       return `${year}-${month}-${day}`;
     };
     
+    // Query a slightly wider date range (1 day before to 1 day after)
+    const queryStartDate = new Date(startTime);
+    queryStartDate.setDate(queryStartDate.getDate() - 1);
+    const queryEndDate = new Date(endTime);
+    queryEndDate.setDate(queryEndDate.getDate() + 1);
+    
     const queryStartDateStr = getLocalDateStr(queryStartDate);
     const queryEndDateStr = getLocalDateStr(queryEndDate);
     
-    console.log('🔍 Querying hour data:', {
-      startTime: startTime.toLocaleString(),
-      endTime: endTime.toLocaleString(),
-      queryStartDateStr,
-      queryEndDateStr,
-      hours,
-      hourOffset,
+    // Use unified fetch function with caching
+    const { social: socialData, custom: customData, qr: qrData } = await fetchAllClickData(
       entityId,
       uuid,
-    });
-    
-    // Query all three tables
-    const [socialResult, customResult, qrResult] = await Promise.all([
-      supabase.from('social_clicks_by_minute')
-        .select('click_date, click_hour, platform, click_count')
-        .eq('profile_id', entityId)
-        .gte('click_date', queryStartDateStr)
-        .lte('click_date', queryEndDateStr),
-      supabase.from('custom_link_clicks_by_minute')
-        .select('click_date, click_hour, link_index, click_count')
-        .eq('profile_id', entityId)
-        .gte('click_date', queryStartDateStr)
-        .lte('click_date', queryEndDateStr),
-      supabase.from('qr_scans_by_minute')
-        .select('click_date, click_hour, click_count')
-        .eq('profile_uuid', uuid)
-        .gte('click_date', queryStartDateStr)
-        .lte('click_date', queryEndDateStr),
-    ]);
-    
-    const { data: socialData, error: socialError } = socialResult;
-    const { data: customData, error: customError } = customResult;
-    const { data: qrData, error: qrError } = qrResult;
-    
-    if (socialError) console.error('❌ Error querying social clicks:', socialError);
-    if (customError) console.error('❌ Error querying custom link clicks:', customError);
-    if (qrError) console.error('❌ Error querying QR scans:', qrError);
+      queryStartDateStr,
+      queryEndDateStr
+    );
     
     // Aggregate by hour
     const hourData = {};
@@ -1147,35 +1190,30 @@ export const getClicksByDayDirect = async (entityId, uuid, days = 7, dayOffset =
     startDate.setDate(endDate.getDate() - (days - 1));
     startDate.setHours(0, 0, 0, 0);
     
-    const startDateStr = startDate.toISOString().split('T')[0];
-    const endDateStr = endDate.toISOString().split('T')[0];
+    // Get local date strings (not UTC) to match how data is stored
+    const getLocalDateStr = (date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
     
-    // Query all three tables
-    const [socialResult, customResult, qrResult] = await Promise.all([
-      supabase.from('social_clicks_by_minute')
-        .select('click_date, platform, click_count')
-        .eq('profile_id', entityId)
-        .gte('click_date', startDateStr)
-        .lte('click_date', endDateStr),
-      supabase.from('custom_link_clicks_by_minute')
-        .select('click_date, link_index, click_count')
-        .eq('profile_id', entityId)
-        .gte('click_date', startDateStr)
-        .lte('click_date', endDateStr),
-      supabase.from('qr_scans_by_minute')
-        .select('click_date, click_count')
-        .eq('profile_uuid', uuid)
-        .gte('click_date', startDateStr)
-        .lte('click_date', endDateStr),
-    ]);
+    // Query a slightly wider date range (1 day before to 1 day after)
+    const queryStartDate = new Date(startDate);
+    queryStartDate.setDate(queryStartDate.getDate() - 1);
+    const queryEndDate = new Date(endDate);
+    queryEndDate.setDate(queryEndDate.getDate() + 1);
     
-    const { data: socialData, error: socialError } = socialResult;
-    const { data: customData, error: customError } = customResult;
-    const { data: qrData, error: qrError } = qrResult;
+    const queryStartDateStr = getLocalDateStr(queryStartDate);
+    const queryEndDateStr = getLocalDateStr(queryEndDate);
     
-    if (socialError) console.error('❌ Error querying social clicks:', socialError);
-    if (customError) console.error('❌ Error querying custom link clicks:', customError);
-    if (qrError) console.error('❌ Error querying QR scans:', qrError);
+    // Use unified fetch function with caching
+    const { social: socialData, custom: customData, qr: qrData } = await fetchAllClickData(
+      entityId,
+      uuid,
+      queryStartDateStr,
+      queryEndDateStr
+    );
     
     // Aggregate by day
     const dayData = {};
@@ -1237,9 +1275,16 @@ export const getQRScanTimestamps = async (uuid) => {
     console.log('📱 QR scan data from DB:', { uuid, rowCount: data?.length || 0, sample: data?.slice(0, 3) });
     
     // Convert minute-based data to timestamps (one per click)
+    // Sort client-side for better performance (avoids database sorting overhead)
+    const sortedData = data && Array.isArray(data) ? [...data].sort((a, b) => {
+      if (a.click_date !== b.click_date) return a.click_date.localeCompare(b.click_date);
+      if (a.click_hour !== b.click_hour) return a.click_hour - b.click_hour;
+      return a.click_minute - b.click_minute;
+    }) : [];
+    
     const timestamps = [];
-    if (data && Array.isArray(data)) {
-    data.forEach(row => {
+    if (sortedData.length > 0) {
+    sortedData.forEach(row => {
       // Create a timestamp for each click in this minute
         // Note: click_date, click_hour, and click_minute are stored in LOCAL time (from getHours/getMinutes)
         // We need to create a date in local timezone, then convert to ISO
@@ -1267,10 +1312,7 @@ export const getSocialClickTimestamps = async (entityId) => {
     const { data, error } = await supabase
       .from('social_clicks_by_minute')
       .select('platform, click_date, click_hour, click_minute, click_count')
-      .eq('profile_id', entityId)
-      .order('click_date', { ascending: true })
-      .order('click_hour', { ascending: true })
-      .order('click_minute', { ascending: true });
+      .eq('profile_id', entityId);
 
     if (error) {
       console.error('❌ Error getting social click timestamps:', error);
@@ -1279,10 +1321,17 @@ export const getSocialClickTimestamps = async (entityId) => {
     
     console.log('🖱️ Social click data from DB:', { entityId, rowCount: data?.length || 0, sample: data?.slice(0, 3) });
     
+    // Sort client-side for better performance (avoids database sorting overhead)
+    const sortedData = data && Array.isArray(data) ? [...data].sort((a, b) => {
+      if (a.click_date !== b.click_date) return a.click_date.localeCompare(b.click_date);
+      if (a.click_hour !== b.click_hour) return a.click_hour - b.click_hour;
+      return a.click_minute - b.click_minute;
+    }) : [];
+    
     // Group by platform and convert to timestamps
     const timestamps = {};
-    if (data && Array.isArray(data)) {
-    data.forEach(row => {
+    if (sortedData.length > 0) {
+    sortedData.forEach(row => {
       if (!timestamps[row.platform]) {
         timestamps[row.platform] = [];
       }
@@ -1323,10 +1372,7 @@ export const getCustomLinkClickTimestamps = async (entityId) => {
     const { data, error } = await supabase
       .from('custom_link_clicks_by_minute')
       .select('link_index, click_date, click_hour, click_minute, click_count')
-      .eq('profile_id', entityId)
-      .order('click_date', { ascending: true })
-      .order('click_hour', { ascending: true })
-      .order('click_minute', { ascending: true });
+      .eq('profile_id', entityId);
 
     if (error) {
       console.error('❌ Error getting custom link click timestamps:', error);
@@ -1335,10 +1381,17 @@ export const getCustomLinkClickTimestamps = async (entityId) => {
     
     console.log('🔗 Custom link click data from DB:', { entityId, rowCount: data?.length || 0, sample: data?.slice(0, 3) });
     
+    // Sort client-side for better performance (avoids database sorting overhead)
+    const sortedData = data && Array.isArray(data) ? [...data].sort((a, b) => {
+      if (a.click_date !== b.click_date) return a.click_date.localeCompare(b.click_date);
+      if (a.click_hour !== b.click_hour) return a.click_hour - b.click_hour;
+      return a.click_minute - b.click_minute;
+    }) : [];
+    
     // Group by link index and convert to timestamps
     const timestamps = {};
-    if (data && Array.isArray(data)) {
-    data.forEach(row => {
+    if (sortedData.length > 0) {
+    sortedData.forEach(row => {
       const index = row.link_index.toString();
       if (!timestamps[index]) {
         timestamps[index] = [];

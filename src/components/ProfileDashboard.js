@@ -51,10 +51,12 @@ function ProfileDashboard({ entityId, onBack, onLogout, currentUser }) {
             
             setEntity(loadedEntity);
             setSummaryStats(getSummaryStats(loadedEntity));
-            // Use direct database queries instead of timestamp reconstruction
-            const minute = await getClicksByMinuteDirect(loadedEntity.id, loadedEntity.uuid, 30, minuteOffset);
-            const hour = await getClicksByHourDirect(loadedEntity.id, loadedEntity.uuid, 12, hourOffset);
-            const dayBreakdown = await getClicksByDayDirect(loadedEntity.id, loadedEntity.uuid, 7, dayOffset);
+            // Use direct database queries in parallel - cache will deduplicate overlapping queries
+            const [minute, hour, dayBreakdown] = await Promise.all([
+              getClicksByMinuteDirect(loadedEntity.id, loadedEntity.uuid, 30, minuteOffset),
+              getClicksByHourDirect(loadedEntity.id, loadedEntity.uuid, 12, hourOffset),
+              getClicksByDayDirect(loadedEntity.id, loadedEntity.uuid, 7, dayOffset),
+            ]);
             
             console.log('📊 Generated chart data:', {
               minuteDataSample: minute.slice(0, 2),
@@ -83,9 +85,15 @@ function ProfileDashboard({ entityId, onBack, onLogout, currentUser }) {
       if (loadedEntity) {
         setEntity(loadedEntity);
         setSummaryStats(getSummaryStats(loadedEntity));
-        setMinuteData(await getClicksByMinuteDirect(loadedEntity.id, loadedEntity.uuid, 30, minuteOffset));
-        setHourData(await getClicksByHourDirect(loadedEntity.id, loadedEntity.uuid, 12, hourOffset));
-        setDayDataWithBreakdown(await getClicksByDayDirect(loadedEntity.id, loadedEntity.uuid, 7, dayOffset));
+        // Run queries in parallel - cache will deduplicate overlapping queries
+        const [minute, hour, day] = await Promise.all([
+          getClicksByMinuteDirect(loadedEntity.id, loadedEntity.uuid, 30, minuteOffset),
+          getClicksByHourDirect(loadedEntity.id, loadedEntity.uuid, 12, hourOffset),
+          getClicksByDayDirect(loadedEntity.id, loadedEntity.uuid, 7, dayOffset),
+        ]);
+        setMinuteData(minute);
+        setHourData(hour);
+        setDayDataWithBreakdown(day);
       }
     } catch (error) {
       console.error('Error refreshing entity data:', error);
