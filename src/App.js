@@ -8,13 +8,14 @@ import EntityView from './components/EntityView';
 import SocialMediaIconsPage from './components/SocialMediaIconsPage';
 import ProfileDashboard from './components/ProfileDashboard';
 import ConfirmDialog from './components/ConfirmDialog';
+import Subscription from './components/Subscription';
 import { getEntities, deactivateEntity, reactivateEntity } from './utils/storage';
 import { getTheme, applyTheme } from './utils/theme';
 import { supabase, isClientValid, testConnection } from './lib/supabase';
 import { getCurrentUser, logoutUser } from './utils/auth';
 
 function App() {
-  const [currentPage, setCurrentPage] = useState('home'); // 'home', 'list', 'register', 'view', 'edit', 'icons', 'dashboard'
+  const [currentPage, setCurrentPage] = useState('home'); // 'home', 'list', 'register', 'view', 'edit', 'icons', 'dashboard', 'subscription'
   const [entities, setEntities] = useState([]);
   const [selectedEntity, setSelectedEntity] = useState(null);
   const [editingEntity, setEditingEntity] = useState(null);
@@ -450,6 +451,9 @@ function App() {
         setCurrentPage('list');
       }
     };
+    const handleViewSubscription = () => {
+      setCurrentPage('subscription');
+    };
     return (
       <Home 
         onGetStarted={handleGetStarted} 
@@ -458,14 +462,15 @@ function App() {
         onViewProfiles={handleViewProfiles}
         onCreateProfile={handleCreateProfile}
         onViewDashboard={handleViewDashboardFromHome}
+        onViewSubscription={handleViewSubscription}
         onLogout={handleLogout}
         entities={entities}
       />
     );
   }
 
-  // Show login screen if not authenticated (for protected pages like list, register, view, dashboard)
-  const protectedPages = ['list', 'register', 'view', 'dashboard'];
+  // Show login screen if not authenticated (for protected pages like list, register, view, dashboard, subscription)
+  const protectedPages = ['list', 'register', 'view', 'dashboard', 'subscription'];
   if (!currentUser && protectedPages.includes(currentPage)) {
     return (
       <div className="App">
@@ -596,6 +601,14 @@ function App() {
                   />
                 )}
               </>
+            )}
+
+            {currentPage === 'subscription' && (
+              <Subscription
+                onBack={() => setCurrentPage('home')}
+                currentUser={currentUser}
+                onLogout={handleLogout}
+              />
             )}
       </div>
     </div>

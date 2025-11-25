@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import './Home.css';
-import { FaHeart, FaQrcode, FaShareAlt, FaUsers, FaRocket, FaSignInAlt, FaList, FaPlus, FaUser, FaChartBar, FaMousePointer, FaSignOutAlt } from 'react-icons/fa';
+import { FaHeart, FaQrcode, FaShareAlt, FaUsers, FaRocket, FaSignInAlt, FaList, FaPlus, FaUser, FaChartBar, FaMousePointer, FaSignOutAlt, FaCrown } from 'react-icons/fa';
 import { getTheme, applyTheme } from '../utils/theme';
 import { getEntityWithAnalytics } from '../utils/storage';
 
-function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProfile, onViewDashboard, onLogout, entities }) {
+function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProfile, onViewDashboard, onLogout, entities, onViewSubscription }) {
   const [summaryStats, setSummaryStats] = useState({ totalScans: 0, totalClicks: 0, totalProfiles: 0 });
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const isLoadingRef = useRef(false);
@@ -256,6 +256,15 @@ function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProf
                   style={{ backgroundColor: 'transparent', border: '2px solid currentColor' }}
                 >
                   <FaChartBar /> View Dashboard
+                </button>
+              )}
+              {onViewSubscription && currentUser && (
+                <button 
+                  onClick={onViewSubscription} 
+                  className="cta-button"
+                  style={{ backgroundColor: '#ffd700', color: '#2d3748', border: 'none' }}
+                >
+                  <FaCrown /> Upgrade Plan
                 </button>
               )}
             </div>
