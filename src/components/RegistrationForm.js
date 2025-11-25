@@ -613,13 +613,6 @@ function RegistrationForm({ entity, onSave, onCancel, currentUser, onLogout }) {
 
   return (
     <div>
-      {onLogout && currentUser && (
-        <div className="logout-container-form">
-          <button onClick={onLogout} className="logout-button-form" title="Logout">
-            <FaSignOutAlt /> Logout ({currentUser.username || currentUser.name || currentUser.email?.split('@')[0] || 'User'})
-          </button>
-        </div>
-      )}
     <form onSubmit={handleSubmit} className="registration-form">
       <div className="form-section">
         <h2 className="section-title">Basic Information</h2>

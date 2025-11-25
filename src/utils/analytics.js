@@ -299,7 +299,7 @@ export const getClicksByMinuteWithBreakdown = (entity, minutes = 30, offsetMinut
         qrScansInRange++;
         const intervalKey = getIntervalKey(date);
         if (!clicksByInterval[intervalKey]) {
-          clicksByInterval[intervalKey] = { qrScans: 0, socialClicks: 0, customLinkClicks: 0, total: 0 };
+          clicksByInterval[intervalKey] = { qrScans: 0, socialClicks: 0, customLinkClicks: 0, total: 0, platforms: {} };
         }
         clicksByInterval[intervalKey].qrScans++;
         clicksByInterval[intervalKey].total++;
@@ -313,7 +313,7 @@ export const getClicksByMinuteWithBreakdown = (entity, minutes = 30, offsetMinut
     let socialClicksInRange = 0;
     let totalSocialClicks = 0;
     let clicksOutsideRange = [];
-    Object.values(entity.clickTimestamps).forEach((platformTimestamps) => {
+    Object.entries(entity.clickTimestamps).forEach(([platform, platformTimestamps]) => {
       if (Array.isArray(platformTimestamps)) {
         totalSocialClicks += platformTimestamps.length;
         platformTimestamps.forEach((timestamp) => {
@@ -324,10 +324,15 @@ export const getClicksByMinuteWithBreakdown = (entity, minutes = 30, offsetMinut
             socialClicksInRange++;
             const intervalKey = getIntervalKey(date);
             if (!clicksByInterval[intervalKey]) {
-              clicksByInterval[intervalKey] = { qrScans: 0, socialClicks: 0, customLinkClicks: 0, total: 0 };
+              clicksByInterval[intervalKey] = { qrScans: 0, socialClicks: 0, customLinkClicks: 0, total: 0, platforms: {} };
             }
             clicksByInterval[intervalKey].socialClicks++;
             clicksByInterval[intervalKey].total++;
+            // Track platform breakdown
+            if (!clicksByInterval[intervalKey].platforms[platform]) {
+              clicksByInterval[intervalKey].platforms[platform] = 0;
+            }
+            clicksByInterval[intervalKey].platforms[platform]++;
             
             // Debug first few matches
             if (socialClicksInRange <= 3) {
@@ -377,7 +382,7 @@ export const getClicksByMinuteWithBreakdown = (entity, minutes = 30, offsetMinut
             customClicksInRange++;
             const intervalKey = getIntervalKey(date);
             if (!clicksByInterval[intervalKey]) {
-              clicksByInterval[intervalKey] = { qrScans: 0, socialClicks: 0, customLinkClicks: 0, total: 0 };
+              clicksByInterval[intervalKey] = { qrScans: 0, socialClicks: 0, customLinkClicks: 0, total: 0, platforms: {} };
             }
             clicksByInterval[intervalKey].customLinkClicks++;
             clicksByInterval[intervalKey].total++;
@@ -406,7 +411,7 @@ export const getClicksByMinuteWithBreakdown = (entity, minutes = 30, offsetMinut
     intervalDate.setMilliseconds(0);
     
     const intervalKey = getIntervalKey(intervalDate);
-    const data = clicksByInterval[intervalKey] || { qrScans: 0, socialClicks: 0, customLinkClicks: 0, total: 0 };
+    const data = clicksByInterval[intervalKey] || { qrScans: 0, socialClicks: 0, customLinkClicks: 0, total: 0, platforms: {} };
     
     console.log('📊 Interval:', {
       i,
@@ -438,16 +443,20 @@ export const getClicksByMinuteWithBreakdown = (entity, minutes = 30, offsetMinut
 /**
  * Get clicks by hour with breakdown by click type
  * @param {Object} entity - The entity object with analytics
- * @param {number} days - Number of days to show (default: 7)
+ * @param {number} hours - Number of hours to show (default: 12)
+ * @param {number} hourOffset - Number of hours to offset from now (default: 0)
  */
-export const getClicksByHourWithBreakdown = (entity, days = 7) => {
+export const getClicksByHourWithBreakdown = (entity, hours = 12, hourOffset = 0) => {
   const now = new Date();
-  const startTime = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+  const endTime = new Date(now.getTime() - hourOffset * 60 * 60 * 1000);
+  const startTime = new Date(endTime.getTime() - hours * 60 * 60 * 1000);
   
   console.log('⏰ Hour breakdown time range:', {
     now: now.toISOString(),
     startTime: startTime.toISOString(),
-    days,
+    endTime: endTime.toISOString(),
+    hours,
+    hourOffset,
   });
   
   // Initialize data structure
@@ -462,7 +471,7 @@ export const getClicksByHourWithBreakdown = (entity, days = 7) => {
         qrScansInRange++;
         const hourKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}-${String(date.getHours()).padStart(2, '0')}`;
         if (!clicksByHour[hourKey]) {
-          clicksByHour[hourKey] = { qrScans: 0, socialClicks: 0, customLinkClicks: 0, total: 0 };
+          clicksByHour[hourKey] = { qrScans: 0, socialClicks: 0, customLinkClicks: 0, total: 0, platforms: {} };
         }
         clicksByHour[hourKey].qrScans++;
         clicksByHour[hourKey].total++;
@@ -475,19 +484,24 @@ export const getClicksByHourWithBreakdown = (entity, days = 7) => {
   if (entity.clickTimestamps) {
     let socialClicksInRange = 0;
     let totalSocialClicks = 0;
-    Object.values(entity.clickTimestamps).forEach((platformTimestamps) => {
+    Object.entries(entity.clickTimestamps).forEach(([platform, platformTimestamps]) => {
       if (Array.isArray(platformTimestamps)) {
         totalSocialClicks += platformTimestamps.length;
         platformTimestamps.forEach((timestamp) => {
           const date = new Date(timestamp);
-          if (date >= startTime) {
+          if (date >= startTime && date <= endTime) {
             socialClicksInRange++;
             const hourKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}-${String(date.getHours()).padStart(2, '0')}`;
             if (!clicksByHour[hourKey]) {
-              clicksByHour[hourKey] = { qrScans: 0, socialClicks: 0, customLinkClicks: 0, total: 0 };
+              clicksByHour[hourKey] = { qrScans: 0, socialClicks: 0, customLinkClicks: 0, total: 0, platforms: {} };
             }
             clicksByHour[hourKey].socialClicks++;
             clicksByHour[hourKey].total++;
+            // Track platform breakdown
+            if (!clicksByHour[hourKey].platforms[platform]) {
+              clicksByHour[hourKey].platforms[platform] = 0;
+            }
+            clicksByHour[hourKey].platforms[platform]++;
           }
         });
       }
@@ -504,11 +518,11 @@ export const getClicksByHourWithBreakdown = (entity, days = 7) => {
         totalCustomClicks += linkTimestamps.length;
         linkTimestamps.forEach((timestamp) => {
           const date = new Date(timestamp);
-          if (date >= startTime) {
+          if (date >= startTime && date <= endTime) {
             customClicksInRange++;
             const hourKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}-${String(date.getHours()).padStart(2, '0')}`;
             if (!clicksByHour[hourKey]) {
-              clicksByHour[hourKey] = { qrScans: 0, socialClicks: 0, customLinkClicks: 0, total: 0 };
+              clicksByHour[hourKey] = { qrScans: 0, socialClicks: 0, customLinkClicks: 0, total: 0, platforms: {} };
             }
             clicksByHour[hourKey].customLinkClicks++;
             clicksByHour[hourKey].total++;
@@ -519,12 +533,12 @@ export const getClicksByHourWithBreakdown = (entity, days = 7) => {
     console.log('🔗 Custom clicks in hour range:', customClicksInRange, 'of', totalCustomClicks);
   }
   
-  // Generate hour intervals
+  // Generate hour intervals - show last N hours
   const result = [];
-  for (let i = days * 24 - 1; i >= 0; i--) {
-    const hourDate = new Date(now.getTime() - i * 60 * 60 * 1000);
+  for (let i = hours - 1; i >= 0; i--) {
+    const hourDate = new Date(endTime.getTime() - i * 60 * 60 * 1000);
     const hourKey = `${hourDate.getFullYear()}-${String(hourDate.getMonth() + 1).padStart(2, '0')}-${String(hourDate.getDate()).padStart(2, '0')}-${String(hourDate.getHours()).padStart(2, '0')}`;
-    const data = clicksByHour[hourKey] || { qrScans: 0, socialClicks: 0, customLinkClicks: 0, total: 0 };
+    const data = clicksByHour[hourKey] || { qrScans: 0, socialClicks: 0, customLinkClicks: 0, total: 0, platforms: {} };
     
     result.push({
       date: hourDate.toISOString(),
@@ -570,7 +584,7 @@ export const getClicksByDayWithBreakdown = (entity, days = 7, dayOffset = 0) => 
       if (dateNormalized >= startDate && dateNormalized <= endDate) {
         const dayKey = dateNormalized.toISOString().split('T')[0];
         if (!clicksByDay[dayKey]) {
-          clicksByDay[dayKey] = { qrScans: 0, socialClicks: 0, customLinkClicks: 0, total: 0 };
+          clicksByDay[dayKey] = { qrScans: 0, socialClicks: 0, customLinkClicks: 0, total: 0, platforms: {} };
         }
         clicksByDay[dayKey].qrScans++;
         clicksByDay[dayKey].total++;
@@ -580,7 +594,7 @@ export const getClicksByDayWithBreakdown = (entity, days = 7, dayOffset = 0) => 
   
   // Process social media click timestamps
   if (entity.clickTimestamps) {
-    Object.values(entity.clickTimestamps).forEach((platformTimestamps) => {
+    Object.entries(entity.clickTimestamps).forEach(([platform, platformTimestamps]) => {
       if (Array.isArray(platformTimestamps)) {
         platformTimestamps.forEach((timestamp) => {
           const date = new Date(timestamp);
@@ -590,10 +604,15 @@ export const getClicksByDayWithBreakdown = (entity, days = 7, dayOffset = 0) => 
           if (dateNormalized >= startDate && dateNormalized <= endDate) {
             const dayKey = dateNormalized.toISOString().split('T')[0];
             if (!clicksByDay[dayKey]) {
-              clicksByDay[dayKey] = { qrScans: 0, socialClicks: 0, customLinkClicks: 0, total: 0 };
+              clicksByDay[dayKey] = { qrScans: 0, socialClicks: 0, customLinkClicks: 0, total: 0, platforms: {} };
             }
             clicksByDay[dayKey].socialClicks++;
             clicksByDay[dayKey].total++;
+            // Track platform breakdown
+            if (!clicksByDay[dayKey].platforms[platform]) {
+              clicksByDay[dayKey].platforms[platform] = 0;
+            }
+            clicksByDay[dayKey].platforms[platform]++;
           }
         });
       }
@@ -612,7 +631,7 @@ export const getClicksByDayWithBreakdown = (entity, days = 7, dayOffset = 0) => 
           if (dateNormalized >= startDate && dateNormalized <= endDate) {
             const dayKey = dateNormalized.toISOString().split('T')[0];
             if (!clicksByDay[dayKey]) {
-              clicksByDay[dayKey] = { qrScans: 0, socialClicks: 0, customLinkClicks: 0, total: 0 };
+              clicksByDay[dayKey] = { qrScans: 0, socialClicks: 0, customLinkClicks: 0, total: 0, platforms: {} };
             }
             clicksByDay[dayKey].customLinkClicks++;
             clicksByDay[dayKey].total++;
@@ -629,7 +648,7 @@ export const getClicksByDayWithBreakdown = (entity, days = 7, dayOffset = 0) => 
     date.setDate(startDate.getDate() + i);
     date.setHours(0, 0, 0, 0);
     const dayKey = date.toISOString().split('T')[0];
-    const data = clicksByDay[dayKey] || { qrScans: 0, socialClicks: 0, customLinkClicks: 0, total: 0 };
+    const data = clicksByDay[dayKey] || { qrScans: 0, socialClicks: 0, customLinkClicks: 0, total: 0, platforms: {} };
     
     result.push({
       date: dayKey,

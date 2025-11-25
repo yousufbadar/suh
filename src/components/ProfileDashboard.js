@@ -3,12 +3,10 @@ import './ProfileDashboard.css';
 import { getEntityWithAnalytics } from '../utils/storage';
 import {
   getSummaryStats,
+  getClicksByMinuteWithBreakdown,
+  getClicksByHourWithBreakdown,
+  getClicksByDayWithBreakdown,
 } from '../utils/analytics';
-import {
-  getClicksByMinuteDirect,
-  getClicksByHourDirect,
-  getClicksByDayDirect,
-} from '../utils/storage';
 import {
   FaArrowLeft,
   FaChartLine,
@@ -34,10 +32,13 @@ function ProfileDashboard({ entityId, onBack, onLogout, currentUser }) {
   const [hourOffset, setHourOffset] = useState(0); // 0 = now, 12 = 12 hours ago, etc. (max 7 days = 168 hours)
 
   useEffect(() => {
+    let isMounted = true; // Flag to prevent state updates if component unmounts
+    
     const loadEntityData = async () => {
       if (entityId) {
         try {
           const loadedEntity = await getEntityWithAnalytics(entityId);
+          if (!isMounted) return; // Don't update state if component unmounted
           if (loadedEntity) {
             console.log('📈 Loaded entity with analytics:', {
               entityId,
@@ -51,14 +52,12 @@ function ProfileDashboard({ entityId, onBack, onLogout, currentUser }) {
             
             setEntity(loadedEntity);
             setSummaryStats(getSummaryStats(loadedEntity));
-            // Use direct database queries in parallel - cache will deduplicate overlapping queries
-            const [minute, hour, dayBreakdown] = await Promise.all([
-              getClicksByMinuteDirect(loadedEntity.id, loadedEntity.uuid, 30, minuteOffset),
-              getClicksByHourDirect(loadedEntity.id, loadedEntity.uuid, 12, hourOffset),
-              getClicksByDayDirect(loadedEntity.id, loadedEntity.uuid, 7, dayOffset),
-            ]);
+            // Generate chart data from entity analytics (no additional API calls needed)
+            const minute = getClicksByMinuteWithBreakdown(loadedEntity, 30, minuteOffset);
+            const hour = getClicksByHourWithBreakdown(loadedEntity, 12, hourOffset);
+            const dayBreakdown = getClicksByDayWithBreakdown(loadedEntity, 7, dayOffset);
             
-            console.log('📊 Generated chart data:', {
+            console.log('📊 Generated chart data from entity analytics:', {
               minuteDataSample: minute.slice(0, 2),
               hourDataSample: hour.slice(0, 2),
               dayDataSample: dayBreakdown.slice(0, 2),
@@ -74,6 +73,10 @@ function ProfileDashboard({ entityId, onBack, onLogout, currentUser }) {
       }
     };
     loadEntityData();
+    
+    return () => {
+      isMounted = false; // Cleanup: mark as unmounted
+    };
   }, [entityId, dayOffset, minuteOffset, hourOffset]);
 
   // Manual refresh function (auto-refresh disabled to minimize egress)
@@ -85,12 +88,10 @@ function ProfileDashboard({ entityId, onBack, onLogout, currentUser }) {
       if (loadedEntity) {
         setEntity(loadedEntity);
         setSummaryStats(getSummaryStats(loadedEntity));
-        // Run queries in parallel - cache will deduplicate overlapping queries
-        const [minute, hour, day] = await Promise.all([
-          getClicksByMinuteDirect(loadedEntity.id, loadedEntity.uuid, 30, minuteOffset),
-          getClicksByHourDirect(loadedEntity.id, loadedEntity.uuid, 12, hourOffset),
-          getClicksByDayDirect(loadedEntity.id, loadedEntity.uuid, 7, dayOffset),
-        ]);
+        // Generate chart data from entity analytics (no additional API calls needed)
+        const minute = getClicksByMinuteWithBreakdown(loadedEntity, 30, minuteOffset);
+        const hour = getClicksByHourWithBreakdown(loadedEntity, 12, hourOffset);
+        const day = getClicksByDayWithBreakdown(loadedEntity, 7, dayOffset);
         setMinuteData(minute);
         setHourData(hour);
         setDayDataWithBreakdown(day);
@@ -113,6 +114,32 @@ function ProfileDashboard({ entityId, onBack, onLogout, currentUser }) {
 
 
 
+  // Platform color mapping
+  const platformColors = {
+    facebook: '#1877f2',
+    twitter: '#1da1f2',
+    instagram: '#e4405f',
+    linkedin: '#0077b5',
+    youtube: '#ff0000',
+    pinterest: '#bd081c',
+    snapchat: '#fffc00',
+    tiktok: '#000000',
+    reddit: '#ff4500',
+    github: '#181717',
+    dribbble: '#ea4c89',
+    behance: '#1769ff',
+    telegram: '#0088cc',
+    whatsapp: '#25d366',
+    discord: '#5865f2',
+    twitch: '#9146ff',
+    vimeo: '#1ab7ea',
+    flickr: '#ff0084',
+  };
+
+  const getPlatformColor = (platform) => {
+    return platformColors[platform?.toLowerCase()] || '#10b981';
+  };
+
   const renderBarChart = (data, maxValue, labelKey) => {
     if (!data || data.length === 0) {
       return (
@@ -122,6 +149,18 @@ function ProfileDashboard({ entityId, onBack, onLogout, currentUser }) {
       );
     }
 
+    // Collect all platforms for legend
+    const allPlatforms = new Set();
+    data.forEach(item => {
+      if (item.platforms) {
+        Object.keys(item.platforms).forEach(platform => {
+          if (item.platforms[platform] > 0) {
+            allPlatforms.add(platform);
+          }
+        });
+      }
+    });
+
     return (
       <div className="chart-container">
         <div className="chart-bars">
@@ -130,18 +169,79 @@ function ProfileDashboard({ entityId, onBack, onLogout, currentUser }) {
             const height = maxValue > 0 ? (total / maxValue) * 100 : 0;
             const barHeight = total > 0 ? Math.max(height, 5) : 0; // Minimum 5% to ensure visibility
             
+            // Build platform segments for stacked bar
+            const platformSegments = [];
+            if (item.platforms && Object.keys(item.platforms).length > 0) {
+              // Sort platforms by count (descending) for consistent stacking
+              const sortedPlatforms = Object.entries(item.platforms)
+                .filter(([_, count]) => count > 0)
+                .sort((a, b) => b[1] - a[1]);
+              
+              sortedPlatforms.forEach(([platform, count]) => {
+                const segmentHeight = total > 0 ? (count / total) * 100 : 0;
+                platformSegments.push({
+                  platform,
+                  count,
+                  height: segmentHeight,
+                  color: getPlatformColor(platform),
+                });
+              });
+            }
+            
             return (
               <div key={index} className="chart-bar-wrapper">
                 {/* Always show count above bar */}
                 <span className="chart-bar-value-above">{total}</span>
                 <div 
-                  className="chart-bar" 
+                  className="chart-bar-stacked" 
                   style={{ 
                     height: `${barHeight}%`, 
                     minHeight: total > 0 ? '40px' : '0',
                     position: 'relative',
+                    display: 'flex',
+                    flexDirection: 'column-reverse',
                   }}
                 >
+                  {/* QR Scans segment */}
+                  {item.qrScans > 0 && (
+                    <div
+                      className="chart-bar-segment"
+                      style={{
+                        height: total > 0 ? `${(item.qrScans / total) * 100}%` : '0%',
+                        backgroundColor: '#6366f1',
+                        minHeight: item.qrScans > 0 ? '4px' : '0',
+                      }}
+                      title={`QR Scans: ${item.qrScans}`}
+                    />
+                  )}
+                  
+                  {/* Platform segments (stacked) */}
+                  {platformSegments.map((segment, segIndex) => (
+                    <div
+                      key={segIndex}
+                      className="chart-bar-segment"
+                      style={{
+                        height: `${segment.height}%`,
+                        backgroundColor: segment.color,
+                        minHeight: segment.count > 0 ? '4px' : '0',
+                      }}
+                      title={`${segment.platform}: ${segment.count}`}
+                    />
+                  ))}
+                  
+                  {/* Custom Links segment */}
+                  {item.customLinkClicks > 0 && (
+                    <div
+                      className="chart-bar-segment"
+                      style={{
+                        height: total > 0 ? `${(item.customLinkClicks / total) * 100}%` : '0%',
+                        backgroundColor: '#f59e0b',
+                        minHeight: item.customLinkClicks > 0 ? '4px' : '0',
+                      }}
+                      title={`Custom Links: ${item.customLinkClicks}`}
+                    />
+                  )}
+                  
                   {/* Also show count inside bar for tall bars */}
                   {total > 0 && height >= 20 && (
                     <span className="chart-bar-value" style={{ zIndex: 100 }}>
@@ -166,6 +266,43 @@ function ProfileDashboard({ entityId, onBack, onLogout, currentUser }) {
     const totals = data.map((d) => (d.total !== undefined && d.total !== null ? d.total : 0)).filter(c => c > 0);
     if (totals.length === 0) return 1;
     return Math.max(...totals, 1);
+  };
+
+  const renderChartLegend = (data) => {
+    if (!data || data.length === 0) return null;
+    
+    // Collect all platforms that have clicks
+    const allPlatforms = new Set();
+    data.forEach(item => {
+      if (item.platforms) {
+        Object.keys(item.platforms).forEach(platform => {
+          if (item.platforms[platform] > 0) {
+            allPlatforms.add(platform);
+          }
+        });
+      }
+    });
+    
+    const sortedPlatforms = Array.from(allPlatforms).sort();
+    
+    return (
+      <div className="chart-legend">
+        <div className="legend-item">
+          <span className="legend-color" style={{ backgroundColor: '#6366f1' }}></span>
+          <span>QR Scans</span>
+        </div>
+        {sortedPlatforms.map(platform => (
+          <div key={platform} className="legend-item">
+            <span className="legend-color" style={{ backgroundColor: getPlatformColor(platform) }}></span>
+            <span>{platform.charAt(0).toUpperCase() + platform.slice(1)}</span>
+          </div>
+        ))}
+        <div className="legend-item">
+          <span className="legend-color" style={{ backgroundColor: '#f59e0b' }}></span>
+          <span>Custom Links</span>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -266,8 +403,8 @@ function ProfileDashboard({ entityId, onBack, onLogout, currentUser }) {
                   onClick={async () => {
                     const newOffset = Math.min(120, minuteOffset + 30); // Max 2 hours (120 minutes)
                     setMinuteOffset(newOffset);
-                    if (entityId && entity) {
-                      const data = await getClicksByMinuteDirect(entityId, entity.uuid, 30, newOffset);
+                    if (entity) {
+                      const data = getClicksByMinuteWithBreakdown(entity, 30, newOffset);
                       setMinuteData(data);
                     }
                   }}
@@ -288,8 +425,8 @@ function ProfileDashboard({ entityId, onBack, onLogout, currentUser }) {
                   onClick={async () => {
                     const newOffset = Math.max(0, minuteOffset - 30);
                     setMinuteOffset(newOffset);
-                    if (entityId && entity) {
-                      const data = await getClicksByMinuteDirect(entityId, entity.uuid, 30, newOffset);
+                    if (entity) {
+                      const data = getClicksByMinuteWithBreakdown(entity, 30, newOffset);
                       setMinuteData(data);
                     }
                   }}
@@ -301,20 +438,7 @@ function ProfileDashboard({ entityId, onBack, onLogout, currentUser }) {
               </div>
             </div>
             {renderBarChart(minuteData, getMaxValueForBreakdown(minuteData), 'displayTimeShort')}
-            <div className="chart-legend">
-              <div className="legend-item">
-                <span className="legend-color" style={{ backgroundColor: '#6366f1' }}></span>
-                <span>QR Scans</span>
-              </div>
-              <div className="legend-item">
-                <span className="legend-color" style={{ backgroundColor: '#10b981' }}></span>
-                <span>Social Clicks</span>
-              </div>
-              <div className="legend-item">
-                <span className="legend-color" style={{ backgroundColor: '#f59e0b' }}></span>
-                <span>Custom Links</span>
-              </div>
-            </div>
+            {renderChartLegend(minuteData)}
           </div>
 
           {/* Clicks per Hour */}
@@ -329,8 +453,8 @@ function ProfileDashboard({ entityId, onBack, onLogout, currentUser }) {
                   onClick={async () => {
                     const newOffset = Math.min(168, hourOffset + 12); // Max 7 days (168 hours)
                     setHourOffset(newOffset);
-                    if (entityId && entity) {
-                      const data = await getClicksByHourDirect(entityId, entity.uuid, 12, newOffset);
+                    if (entity) {
+                      const data = getClicksByHourWithBreakdown(entity, 12, newOffset);
                       setHourData(data);
                     }
                   }}
@@ -351,8 +475,8 @@ function ProfileDashboard({ entityId, onBack, onLogout, currentUser }) {
                   onClick={async () => {
                     const newOffset = Math.max(0, hourOffset - 12);
                     setHourOffset(newOffset);
-                    if (entityId && entity) {
-                      const data = await getClicksByHourDirect(entityId, entity.uuid, 12, newOffset);
+                    if (entity) {
+                      const data = getClicksByHourWithBreakdown(entity, 12, newOffset);
                       setHourData(data);
                     }
                   }}
@@ -364,20 +488,7 @@ function ProfileDashboard({ entityId, onBack, onLogout, currentUser }) {
               </div>
             </div>
             {renderBarChart(hourData, getMaxValueForBreakdown(hourData), 'displayHour')}
-            <div className="chart-legend">
-              <div className="legend-item">
-                <span className="legend-color" style={{ backgroundColor: '#6366f1' }}></span>
-                <span>QR Scans</span>
-              </div>
-              <div className="legend-item">
-                <span className="legend-color" style={{ backgroundColor: '#10b981' }}></span>
-                <span>Social Clicks</span>
-              </div>
-              <div className="legend-item">
-                <span className="legend-color" style={{ backgroundColor: '#f59e0b' }}></span>
-                <span>Custom Links</span>
-              </div>
-            </div>
+            {renderChartLegend(hourData)}
           </div>
 
           {/* Clicks per Day */}
@@ -392,8 +503,8 @@ function ProfileDashboard({ entityId, onBack, onLogout, currentUser }) {
                   onClick={async () => {
                     const newOffset = dayOffset + 7;
                     setDayOffset(newOffset);
-                    if (entityId && entity) {
-                      const data = await getClicksByDayDirect(entityId, entity.uuid, 7, newOffset);
+                    if (entity) {
+                      const data = getClicksByDayWithBreakdown(entity, 7, newOffset);
                       setDayDataWithBreakdown(data);
                     }
                   }}
@@ -414,7 +525,7 @@ function ProfileDashboard({ entityId, onBack, onLogout, currentUser }) {
                         const newOffset = Math.max(0, dayOffset - 7);
                         setDayOffset(newOffset);
                         if (entityId && entity) {
-                          const data = await getClicksByDayDirect(entityId, entity.uuid, 7, newOffset);
+                          const data = getClicksByDayWithBreakdown(entity, 7, newOffset);
                           setDayDataWithBreakdown(data);
                         }
                       }}
@@ -426,20 +537,7 @@ function ProfileDashboard({ entityId, onBack, onLogout, currentUser }) {
               </div>
             </div>
             {renderBarChart(dayDataWithBreakdown, getMaxValueForBreakdown(dayDataWithBreakdown), 'displayDate')}
-            <div className="chart-legend">
-              <div className="legend-item">
-                <span className="legend-color" style={{ backgroundColor: '#6366f1' }}></span>
-                <span>QR Scans</span>
-              </div>
-              <div className="legend-item">
-                <span className="legend-color" style={{ backgroundColor: '#10b981' }}></span>
-                <span>Social Clicks</span>
-              </div>
-              <div className="legend-item">
-                <span className="legend-color" style={{ backgroundColor: '#f59e0b' }}></span>
-                <span>Custom Links</span>
-              </div>
-            </div>
+            {renderChartLegend(dayDataWithBreakdown)}
           </div>
         </div>
       </div>

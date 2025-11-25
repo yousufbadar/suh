@@ -767,6 +767,8 @@ export const trackCustomLinkClick = async (entityId, customLinkIndex) => {
 // Query cache to avoid duplicate API calls
 const queryCache = new Map();
 const inFlightRequests = new Map(); // Track in-flight requests to prevent duplicates
+const timestampCache = new Map(); // Cache for timestamp queries
+const timestampInFlight = new Map(); // Track in-flight timestamp requests
 const CACHE_TTL = 30000; // 30 seconds cache
 
 // Helper to get cache key
@@ -978,10 +980,17 @@ export const getClicksByMinuteDirect = async (entityId, uuid, minutes = 30, offs
           const intervalMinute = Math.floor(row.click_minute / 5) * 5;
           const intervalKey = `${row.click_date}-${String(row.click_hour).padStart(2, '0')}-${String(intervalMinute).padStart(2, '0')}`;
           if (!intervalData[intervalKey]) {
-            intervalData[intervalKey] = { qrScans: 0, socialClicks: 0, customLinkClicks: 0, total: 0 };
+            intervalData[intervalKey] = { qrScans: 0, socialClicks: 0, customLinkClicks: 0, total: 0, platforms: {} };
           }
           intervalData[intervalKey].socialClicks += row.click_count || 0;
           intervalData[intervalKey].total += row.click_count || 0;
+          // Track platform breakdown
+          if (row.platform) {
+            if (!intervalData[intervalKey].platforms[row.platform]) {
+              intervalData[intervalKey].platforms[row.platform] = 0;
+            }
+            intervalData[intervalKey].platforms[row.platform] += row.click_count || 0;
+          }
           
           if (processed <= 5) {
             console.log('✅ Social click in range:', {
@@ -1053,7 +1062,7 @@ export const getClicksByMinuteDirect = async (entityId, uuid, minutes = 30, offs
       const minute = intervalDate.getMinutes();
       const intervalKey = `${dateStr}-${String(hour).padStart(2, '0')}-${String(minute).padStart(2, '0')}`;
       
-      const data = intervalData[intervalKey] || { qrScans: 0, socialClicks: 0, customLinkClicks: 0, total: 0 };
+      const data = intervalData[intervalKey] || { qrScans: 0, socialClicks: 0, customLinkClicks: 0, total: 0, platforms: {} };
       
       const nextInterval = new Date(intervalDate.getTime() + 5 * 60 * 1000);
       const displayTime = `${intervalDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })} - ${nextInterval.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`;
@@ -1133,10 +1142,18 @@ export const getClicksByHourDirect = async (entityId, uuid, hours = 12, hourOffs
           if (rowDate >= startTime && rowDate <= endTime) {
             const hourKey = `${row.click_date}-${String(row.click_hour).padStart(2, '0')}`;
             if (!hourData[hourKey]) {
-              hourData[hourKey] = { qrScans: 0, socialClicks: 0, customLinkClicks: 0, total: 0 };
+              hourData[hourKey] = { qrScans: 0, socialClicks: 0, customLinkClicks: 0, total: 0, platforms: {} };
             }
-            if (index === 0) hourData[hourKey].socialClicks += row.click_count || 0;
-            else if (index === 1) hourData[hourKey].customLinkClicks += row.click_count || 0;
+            if (index === 0) {
+              hourData[hourKey].socialClicks += row.click_count || 0;
+              // Track platform breakdown
+              if (row.platform) {
+                if (!hourData[hourKey].platforms[row.platform]) {
+                  hourData[hourKey].platforms[row.platform] = 0;
+                }
+                hourData[hourKey].platforms[row.platform] += row.click_count || 0;
+              }
+            } else if (index === 1) hourData[hourKey].customLinkClicks += row.click_count || 0;
             else hourData[hourKey].qrScans += row.click_count || 0;
             hourData[hourKey].total += row.click_count || 0;
           }
@@ -1155,7 +1172,7 @@ export const getClicksByHourDirect = async (entityId, uuid, hours = 12, hourOffs
       const dateStr = getLocalDateStr(hourDate);
       const hour = hourDate.getHours();
       const hourKey = `${dateStr}-${String(hour).padStart(2, '0')}`;
-      const data = hourData[hourKey] || { qrScans: 0, socialClicks: 0, customLinkClicks: 0, total: 0 };
+      const data = hourData[hourKey] || { qrScans: 0, socialClicks: 0, customLinkClicks: 0, total: 0, platforms: {} };
       
       result.push({
         date: hourDate.toISOString(),
@@ -1223,10 +1240,18 @@ export const getClicksByDayDirect = async (entityId, uuid, days = 7, dayOffset =
       if (data && Array.isArray(data)) {
         data.forEach(row => {
           if (!dayData[row.click_date]) {
-            dayData[row.click_date] = { qrScans: 0, socialClicks: 0, customLinkClicks: 0, total: 0 };
+            dayData[row.click_date] = { qrScans: 0, socialClicks: 0, customLinkClicks: 0, total: 0, platforms: {} };
           }
-          if (index === 0) dayData[row.click_date].socialClicks += row.click_count || 0;
-          else if (index === 1) dayData[row.click_date].customLinkClicks += row.click_count || 0;
+          if (index === 0) {
+            dayData[row.click_date].socialClicks += row.click_count || 0;
+            // Track platform breakdown
+            if (row.platform) {
+              if (!dayData[row.click_date].platforms[row.platform]) {
+                dayData[row.click_date].platforms[row.platform] = 0;
+              }
+              dayData[row.click_date].platforms[row.platform] += row.click_count || 0;
+            }
+          } else if (index === 1) dayData[row.click_date].customLinkClicks += row.click_count || 0;
           else dayData[row.click_date].qrScans += row.click_count || 0;
           dayData[row.click_date].total += row.click_count || 0;
         });
@@ -1240,7 +1265,7 @@ export const getClicksByDayDirect = async (entityId, uuid, days = 7, dayOffset =
       date.setDate(startDate.getDate() + i);
       date.setHours(0, 0, 0, 0);
       const dayKey = date.toISOString().split('T')[0];
-      const data = dayData[dayKey] || { qrScans: 0, socialClicks: 0, customLinkClicks: 0, total: 0 };
+      const data = dayData[dayKey] || { qrScans: 0, socialClicks: 0, customLinkClicks: 0, total: 0, platforms: {} };
       
       result.push({
         date: dayKey,
@@ -1258,61 +1283,110 @@ export const getClicksByDayDirect = async (entityId, uuid, days = 7, dayOffset =
 
 // Helper functions to get analytics data (for dashboard) - minute-based
 export const getQRScanTimestamps = async (uuid) => {
+  const cacheKey = `qr_timestamps_${uuid}`;
+  
+  // Check cache
+  const cached = timestampCache.get(cacheKey);
+  if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
+    console.log('📦 Using cached QR scan timestamps');
+    return cached.data;
+  }
+  
+  // Check if request is in flight
+  const inFlight = timestampInFlight.get(cacheKey);
+  if (inFlight) {
+    console.log('⏳ Waiting for in-flight QR scan timestamps request');
+    return await inFlight;
+  }
+  
   try {
-    const { data, error } = await supabase
-      .from('qr_scans_by_minute')
-      .select('click_date, click_hour, click_minute, click_count')
-      .eq('profile_uuid', uuid)
-      .order('click_date', { ascending: true })
-      .order('click_hour', { ascending: true })
-      .order('click_minute', { ascending: true });
+    const requestPromise = (async () => {
+      const { data, error } = await supabase
+        .from('qr_scans_by_minute')
+        .select('click_date, click_hour, click_minute, click_count')
+        .eq('profile_uuid', uuid);
 
-    if (error) {
-      console.error('❌ Error getting QR scan timestamps:', error);
-      throw error;
-    }
-    
-    console.log('📱 QR scan data from DB:', { uuid, rowCount: data?.length || 0, sample: data?.slice(0, 3) });
-    
-    // Convert minute-based data to timestamps (one per click)
-    // Sort client-side for better performance (avoids database sorting overhead)
-    const sortedData = data && Array.isArray(data) ? [...data].sort((a, b) => {
-      if (a.click_date !== b.click_date) return a.click_date.localeCompare(b.click_date);
-      if (a.click_hour !== b.click_hour) return a.click_hour - b.click_hour;
-      return a.click_minute - b.click_minute;
-    }) : [];
-    
-    const timestamps = [];
-    if (sortedData.length > 0) {
-    sortedData.forEach(row => {
-      // Create a timestamp for each click in this minute
-        // Note: click_date, click_hour, and click_minute are stored in LOCAL time (from getHours/getMinutes)
-        // We need to create a date in local timezone, then convert to ISO
-        // Parse the date components
-        const [year, month, day] = row.click_date.split('-').map(Number);
-        // Create date in local timezone (month is 0-indexed in JS Date)
-        const date = new Date(year, month - 1, day, row.click_hour, row.click_minute, 0, 0);
-        
-        for (let i = 0; i < (row.click_count || 0); i++) {
-        timestamps.push(date.toISOString());
+      if (error) {
+        console.error('❌ Error getting QR scan timestamps:', error);
+        throw error;
       }
-    });
-    }
+      
+      console.log('📱 QR scan data from DB:', { uuid, rowCount: data?.length || 0, sample: data?.slice(0, 3) });
+      
+      // Convert minute-based data to timestamps (one per click)
+      // Sort client-side for better performance (avoids database sorting overhead)
+      const sortedData = data && Array.isArray(data) ? [...data].sort((a, b) => {
+        if (a.click_date !== b.click_date) return a.click_date.localeCompare(b.click_date);
+        if (a.click_hour !== b.click_hour) return a.click_hour - b.click_hour;
+        return a.click_minute - b.click_minute;
+      }) : [];
+      
+      const timestamps = [];
+      if (sortedData.length > 0) {
+        sortedData.forEach(row => {
+          // Create a timestamp for each click in this minute
+          // Note: click_date, click_hour, and click_minute are stored in LOCAL time (from getHours/getMinutes)
+          // We need to create a date in local timezone, then convert to ISO
+          // Parse the date components
+          const [year, month, day] = row.click_date.split('-').map(Number);
+          // Create date in local timezone (month is 0-indexed in JS Date)
+          const date = new Date(year, month - 1, day, row.click_hour, row.click_minute, 0, 0);
+          
+          for (let i = 0; i < (row.click_count || 0); i++) {
+            timestamps.push(date.toISOString());
+          }
+        });
+      }
+      
+      console.log('📱 QR scan timestamps generated:', timestamps.length);
+      
+      // Cache the result
+      timestampCache.set(cacheKey, {
+        data: timestamps,
+        timestamp: Date.now(),
+      });
+      
+      return timestamps;
+    })();
     
-    console.log('📱 QR scan timestamps generated:', timestamps.length);
-    return timestamps;
+    // Store in-flight request
+    timestampInFlight.set(cacheKey, requestPromise);
+    
+    try {
+      return await requestPromise;
+    } finally {
+      timestampInFlight.delete(cacheKey);
+    }
   } catch (error) {
     console.error('Error getting QR scan timestamps:', error);
+    timestampInFlight.delete(cacheKey);
     return [];
   }
 };
 
 export const getSocialClickTimestamps = async (entityId) => {
+  const cacheKey = `social_timestamps_${entityId}`;
+  
+  // Check cache
+  const cached = timestampCache.get(cacheKey);
+  if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
+    console.log('📦 Using cached social click timestamps');
+    return cached.data;
+  }
+  
+  // Check if request is in flight
+  const inFlight = timestampInFlight.get(cacheKey);
+  if (inFlight) {
+    console.log('⏳ Waiting for in-flight social click timestamps request');
+    return await inFlight;
+  }
+  
   try {
-    const { data, error } = await supabase
-      .from('social_clicks_by_minute')
-      .select('platform, click_date, click_hour, click_minute, click_count')
-      .eq('profile_id', entityId);
+    const requestPromise = (async () => {
+      const { data, error } = await supabase
+        .from('social_clicks_by_minute')
+        .select('platform, click_date, click_hour, click_minute, click_count')
+        .eq('profile_id', entityId);
 
     if (error) {
       console.error('❌ Error getting social click timestamps:', error);
@@ -1359,20 +1433,55 @@ export const getSocialClickTimestamps = async (entityId) => {
     });
     }
     
-    console.log('🖱️ Social click timestamps generated:', Object.keys(timestamps).length, 'platforms');
-    return timestamps;
+      console.log('🖱️ Social click timestamps generated:', Object.keys(timestamps).length, 'platforms');
+      
+      // Cache the result
+      timestampCache.set(cacheKey, {
+        data: timestamps,
+        timestamp: Date.now(),
+      });
+      
+      return timestamps;
+    })();
+    
+    // Store in-flight request
+    timestampInFlight.set(cacheKey, requestPromise);
+    
+    try {
+      return await requestPromise;
+    } finally {
+      timestampInFlight.delete(cacheKey);
+    }
   } catch (error) {
     console.error('Error getting social click timestamps:', error);
+    timestampInFlight.delete(cacheKey);
     return {};
   }
 };
 
 export const getCustomLinkClickTimestamps = async (entityId) => {
+  const cacheKey = `custom_timestamps_${entityId}`;
+  
+  // Check cache
+  const cached = timestampCache.get(cacheKey);
+  if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
+    console.log('📦 Using cached custom link click timestamps');
+    return cached.data;
+  }
+  
+  // Check if request is in flight
+  const inFlight = timestampInFlight.get(cacheKey);
+  if (inFlight) {
+    console.log('⏳ Waiting for in-flight custom link click timestamps request');
+    return await inFlight;
+  }
+  
   try {
-    const { data, error } = await supabase
-      .from('custom_link_clicks_by_minute')
-      .select('link_index, click_date, click_hour, click_minute, click_count')
-      .eq('profile_id', entityId);
+    const requestPromise = (async () => {
+      const { data, error } = await supabase
+        .from('custom_link_clicks_by_minute')
+        .select('link_index, click_date, click_hour, click_minute, click_count')
+        .eq('profile_id', entityId);
 
     if (error) {
       console.error('❌ Error getting custom link click timestamps:', error);
@@ -1407,13 +1516,31 @@ export const getCustomLinkClickTimestamps = async (entityId) => {
         for (let i = 0; i < (row.click_count || 0); i++) {
         timestamps[index].push(date.toISOString());
       }
-    });
-    }
+      });
+      }
+      
+      console.log('🔗 Custom link click timestamps generated:', Object.keys(timestamps).length, 'links');
+      
+      // Cache the result
+      timestampCache.set(cacheKey, {
+        data: timestamps,
+        timestamp: Date.now(),
+      });
+      
+      return timestamps;
+    })();
     
-    console.log('🔗 Custom link click timestamps generated:', Object.keys(timestamps).length, 'links');
-    return timestamps;
+    // Store in-flight request
+    timestampInFlight.set(cacheKey, requestPromise);
+    
+    try {
+      return await requestPromise;
+    } finally {
+      timestampInFlight.delete(cacheKey);
+    }
   } catch (error) {
     console.error('Error getting custom link click timestamps:', error);
+    timestampInFlight.delete(cacheKey);
     return {};
   }
 };
