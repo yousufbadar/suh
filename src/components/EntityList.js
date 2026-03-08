@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './EntityList.css';
 import { FaSearch, FaTrash, FaEdit, FaArchive, FaRedo } from 'react-icons/fa';
 
-function EntityList({ entities, onViewEntity, onEditEntity, onDeleteEntity, onReactivateEntity }) {
+function EntityList({ entities, onViewEntity, onEditEntity, onDeleteEntity, onReactivateEntity, onPermanentDeleteEntity }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [showArchived, setShowArchived] = useState(false);
   const [filteredEntities, setFilteredEntities] = useState(entities);
@@ -148,13 +148,22 @@ function EntityList({ entities, onViewEntity, onEditEntity, onDeleteEntity, onRe
                     </button>
                   </>
                 ) : (
-                  <button
-                    onClick={() => onReactivateEntity && onReactivateEntity(entity.id)}
-                    className="icon-button reactivate-icon"
-                    title="Reactivate"
-                  >
-                    <FaRedo />
-                  </button>
+                  <>
+                    <button
+                      onClick={() => onReactivateEntity && onReactivateEntity(entity.id)}
+                      className="icon-button reactivate-icon"
+                      title="Reactivate"
+                    >
+                      <FaRedo />
+                    </button>
+                    <button
+                      onClick={() => onPermanentDeleteEntity && onPermanentDeleteEntity(entity.id)}
+                      className="icon-button delete-icon"
+                      title="Permanently Delete"
+                    >
+                      <FaTrash />
+                    </button>
+                  </>
                 )}
               </div>
             </div>

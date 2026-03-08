@@ -478,13 +478,17 @@ export const trackQRScan = async (uuid) => {
       return;
     }
 
-    // Get current date, hour, and minute
+    // Get current date, hour, and minute in LOCAL timezone
     const now = new Date();
-    const clickDate = now.toISOString().split('T')[0]; // YYYY-MM-DD
+    // Use local date components to avoid timezone issues
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const clickDate = `${year}-${month}-${day}`; // YYYY-MM-DD in local timezone
     const clickHour = now.getHours();
     const clickMinute = now.getMinutes();
 
-    console.log('📊 QR scan tracking details:', { clickDate, clickHour, clickMinute });
+    console.log('📊 QR scan tracking details:', { clickDate, clickHour, clickMinute, localTime: now.toLocaleString() });
 
     // Check if record exists for this minute
     const { data: existing, error: selectError } = await supabase
@@ -580,13 +584,17 @@ export const trackSocialClick = async (entityId, platform) => {
       return;
     }
 
-    // Get current date, hour, and minute
+    // Get current date, hour, and minute in LOCAL timezone
     const now = new Date();
-    const clickDate = now.toISOString().split('T')[0]; // YYYY-MM-DD
+    // Use local date components to avoid timezone issues
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const clickDate = `${year}-${month}-${day}`; // YYYY-MM-DD in local timezone
     const clickHour = now.getHours();
     const clickMinute = now.getMinutes();
 
-    console.log('📊 Click tracking details:', { clickDate, clickHour, clickMinute });
+    console.log('📊 Click tracking details:', { clickDate, clickHour, clickMinute, localTime: now.toLocaleString() });
 
     // Check if record exists for this minute
     const { data: existing, error: selectError } = await supabase
@@ -684,13 +692,17 @@ export const trackCustomLinkClick = async (entityId, customLinkIndex) => {
       return;
     }
 
-    // Get current date, hour, and minute
+    // Get current date, hour, and minute in LOCAL timezone
     const now = new Date();
-    const clickDate = now.toISOString().split('T')[0]; // YYYY-MM-DD
+    // Use local date components to avoid timezone issues
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const clickDate = `${year}-${month}-${day}`; // YYYY-MM-DD in local timezone
     const clickHour = now.getHours();
     const clickMinute = now.getMinutes();
 
-    console.log('📊 Click tracking details:', { clickDate, clickHour, clickMinute });
+    console.log('📊 Click tracking details:', { clickDate, clickHour, clickMinute, localTime: now.toLocaleString() });
 
     // Check if record exists for this minute
     const { data: existing, error: selectError } = await supabase

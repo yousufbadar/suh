@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import './App.css';
 import Home from './components/Home';
 import Login from './components/Login';
@@ -9,10 +9,11 @@ import SocialMediaIconsPage from './components/SocialMediaIconsPage';
 import ProfileDashboard from './components/ProfileDashboard';
 import ConfirmDialog from './components/ConfirmDialog';
 import Subscription from './components/Subscription';
-import { getEntities, deactivateEntity, reactivateEntity } from './utils/storage';
+import { getEntities, deactivateEntity, reactivateEntity, deleteEntity } from './utils/storage';
 import { getTheme, applyTheme } from './utils/theme';
 import { supabase, isClientValid, testConnection } from './lib/supabase';
 import { getCurrentUser, logoutUser } from './utils/auth';
+import './utils/oauth-diagnostics'; // Load diagnostics helper
 
 function App() {
   const [currentPage, setCurrentPage] = useState('home'); // 'home', 'list', 'register', 'view', 'edit', 'icons', 'dashboard', 'subscription'
@@ -22,10 +23,14 @@ function App() {
   const [uuid, setUuid] = useState(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [entityToDelete, setEntityToDelete] = useState(null);
+  const [showPermanentDeleteDialog, setShowPermanentDeleteDialog] = useState(false);
+  const [entityToPermanentlyDelete, setEntityToPermanentlyDelete] = useState(null);
   const [currentTheme, setCurrentTheme] = useState(getTheme());
   const [currentUser, setCurrentUser] = useState(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [showLogin, setShowLogin] = useState(false);
+  const [subscriptionStatus, setSubscriptionStatus] = useState(null);
+  const currentUserRef = useRef(null);
 
   // Apply theme on initial mount
   useEffect(() => {
@@ -105,6 +110,15 @@ function App() {
           return;
         }
 
+        // Check if this is an OAuth callback (URL contains hash with access_token or error)
+        const hash = window.location.hash;
+        if (hash && (hash.includes('access_token') || hash.includes('error') || hash.includes('code'))) {
+          console.log('🔐 Detected OAuth callback in URL hash');
+          // Supabase will automatically process this via detectSessionInUrl
+          // But we should wait a moment for it to process
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
         // Initial auth check
         await checkAuth();
         
@@ -124,12 +138,23 @@ function App() {
                   const user = await getCurrentUser(event === 'SIGNED_IN');
                   if (user) {
                     console.log('✅ User retrieved:', user.email);
-                    // If user just logged in (SIGNED_IN event), navigate to home
+                    // If user just logged in (SIGNED_IN event), navigate to profiles (list) page and update state
                     if (event === 'SIGNED_IN') {
-                      setCurrentPage('home');
+                      console.log('🔄 SIGNED_IN event - updating user state and navigating to profiles list');
+                      setCurrentPage('list');
+                      setCurrentUser(user);
+                      setShowLogin(false);
+                    } else {
+                      // For other events (like TOKEN_REFRESHED), just update user if it changed
+                      setCurrentUser(prevUser => {
+                        if (!prevUser || prevUser.id !== user.id) {
+                          console.log('🔄 Updating user state from auth listener');
+                          return user;
+                        }
+                        return prevUser;
+                      });
+                      setShowLogin(false);
                     }
-                    setCurrentUser(user);
-                    setShowLogin(false);
                     // Load entities when user logs in
                     // loadEntities will be called automatically by the useEffect that depends on currentUser
                   } else {
@@ -139,9 +164,17 @@ function App() {
                   }
                 } else {
                   console.log('ℹ️  No session, user logged out');
-                  setCurrentUser(null);
-                  // Don't show login on public pages - let the render logic handle it
-                  setShowLogin(false);
+                  // Clear user on SIGNED_OUT event or when session is null (stops any pending profile fetches)
+                  if (event === 'SIGNED_OUT' || event === 'USER_DELETED' || !session) {
+                    console.log('🔄 Clearing user state due to logout');
+                    currentUserRef.current = null;
+                    setCurrentUser(null);
+                    setShowLogin(false);
+                    setSubscriptionStatus(null);
+                    if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
+                      setEntities([]);
+                    }
+                  }
                 }
               } catch (error) {
                 console.error('❌ Error in auth state change handler:', error);
@@ -224,16 +257,53 @@ function App() {
       console.error('Error checking URL params:', error);
     }
     
-    // Load all entities only if authenticated
+    // Load all entities only if authenticated; skip if user changed (e.g. signed out) before timeout fires
+    currentUserRef.current = currentUser;
     if (currentUser) {
+      const userId = currentUser.id;
       setTimeout(() => {
+        if (currentUserRef.current?.id !== userId) return; // signed out, avoid stale profile fetch
         loadEntities().catch(error => {
+          if (currentUserRef.current?.id !== userId) return;
           console.error('Error loading entities:', error);
           setEntities([]);
         });
       }, 0);
+    } else {
+      setEntities([]);
     }
   }, [currentUser, loadEntities]); // Run when currentUser or loadEntities changes
+
+  // Check subscription status when user changes; start trial on signup day if no record (e.g. OAuth)
+  useEffect(() => {
+    const checkSubscription = async () => {
+      if (!currentUser) {
+        setSubscriptionStatus(null);
+        return;
+      }
+
+      try {
+        const { getSubscriptionStatus, startTrial, clearSubscriptionStatusCache } = await import('./utils/subscription');
+        let status = await getSubscriptionStatus(currentUser.id);
+        // Start trial on signup day for users with no subscription record (e.g. first OAuth login)
+        if (status && status.hasSubscriptionRecord === false) {
+          try {
+            await startTrial(currentUser.id);
+            clearSubscriptionStatusCache(currentUser.id);
+            status = await getSubscriptionStatus(currentUser.id, true);
+          } catch (trialErr) {
+            console.warn('Auto-start trial on first login failed:', trialErr);
+          }
+        }
+        setSubscriptionStatus(status);
+      } catch (err) {
+        console.error('Error checking subscription status:', err);
+        setSubscriptionStatus(null);
+      }
+    };
+
+    checkSubscription();
+  }, [currentUser]);
 
   const checkAuth = async () => {
     try {
@@ -260,24 +330,32 @@ function App() {
         return;
       }
 
-      // Set navigation and user state immediately (synchronously) for instant feedback
-      setCurrentPage('home');
+      // Set navigation and user state FIRST (before any async operations)
+      // This ensures the UI updates immediately and prevents login screen from showing
+      console.log('🔄 Setting user state and navigation immediately...');
       setShowLogin(false);
       setCurrentUser(user);
+      // After login, take user to the profiles (list) page
+      setCurrentPage('list');
       
       console.log('✅ Navigation and user state updated immediately');
+      console.log('   - Current page: list');
+      console.log('   - Show login: false');
+      console.log('   - Current user:', user?.email);
 
-      // Verify session exists (non-blocking)
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (!session) {
-          console.warn('⚠️  Login success but no session found, waiting for auth state change...');
-        } else {
-          console.log('✅ Session verified in login success handler');
-        }
-      }).catch(err => {
-        console.error('❌ Error verifying session:', err);
-      });
-      
+      // Wait a moment for session to be fully established (but don't block navigation)
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Verify session exists (for logging/debugging, but don't block on it)
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) {
+        console.error('❌ Error getting session in login success:', sessionError);
+      } else if (session) {
+        console.log('✅ Session verified in login success handler');
+      } else {
+        console.warn('⚠️  Login success but no session found yet - auth state listener will handle it');
+      }
+
       // Load entities asynchronously (don't block navigation)
       loadEntities().catch(err => {
         console.error('❌ Error loading entities after login:', err);
@@ -290,7 +368,7 @@ function App() {
       // Still set the user if we have it, but log the error
       if (user) {
         // Ensure navigation happens even on error
-        setCurrentPage('home');
+        setCurrentPage('list');
         setShowLogin(false);
         setCurrentUser(user);
       }
@@ -299,13 +377,29 @@ function App() {
 
   const handleLogout = async () => {
     try {
-      await logoutUser();
+      console.log('🔐 Logout initiated...');
+      // Clear user state first so no effect schedules profile fetches with old user id
+      currentUserRef.current = null;
       setCurrentUser(null);
-      setShowLogin(true);
       setEntities([]);
+      setSubscriptionStatus(null);
+      setShowLogin(false);
       setCurrentPage('home');
+
+      await logoutUser();
+      console.log('✅ Logout completed, user state cleared');
+      
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('❌ Logout error:', error);
+      currentUserRef.current = null;
+      setCurrentUser(null);
+      setEntities([]);
+      setSubscriptionStatus(null);
+      setShowLogin(false);
+      setCurrentPage('home');
+      
+      // Show error to user
+      alert('Logout encountered an error, but you have been signed out locally. Please refresh the page if you continue to see issues.');
     }
   };
 
@@ -338,10 +432,41 @@ function App() {
   };
 
   const handleDeleteEntity = (id) => {
-    // No authentication required - anyone can delete
+    // Archive (deactivate) the entity
     const entity = entities.find((e) => e.id === id);
     setEntityToDelete(entity);
     setShowConfirmDialog(true);
+  };
+
+  const handlePermanentDeleteEntity = (id) => {
+    // Permanently delete the entity (only for archived profiles)
+    const entity = entities.find((e) => e.id === id);
+    setEntityToPermanentlyDelete(entity);
+    setShowPermanentDeleteDialog(true);
+  };
+
+  const confirmPermanentDelete = async () => {
+    if (entityToPermanentlyDelete) {
+      try {
+        const userId = currentUser?.id || null;
+        await deleteEntity(entityToPermanentlyDelete.id, userId);
+        await loadEntities();
+        if (selectedEntity?.id === entityToPermanentlyDelete.id) {
+          setSelectedEntity(null);
+          setCurrentPage('list');
+        }
+      } catch (error) {
+        console.error('❌ Error permanently deleting entity:', error);
+        alert(error.message || 'Failed to permanently delete profile. Please try again.');
+      }
+    }
+    setShowPermanentDeleteDialog(false);
+    setEntityToPermanentlyDelete(null);
+  };
+
+  const cancelPermanentDelete = () => {
+    setShowPermanentDeleteDialog(false);
+    setEntityToPermanentlyDelete(null);
   };
 
   const confirmDeactivate = async () => {
@@ -427,9 +552,11 @@ function App() {
 
   // Render home page - public access (no authentication required)
   // Note: User session is preserved when navigating to home
+  // Check home page FIRST before checking protected pages to ensure navigation works
   if (currentPage === 'home') {
     console.log('🏠 Rendering home page');
     console.log('👤 Current user state:', currentUser ? `Logged in as ${currentUser.email}` : 'Not logged in');
+    console.log('📄 Current page state:', currentPage);
     const handleShowLogin = () => {
       console.log('🔐 Login button clicked from home page');
       setShowLogin(true);
@@ -465,6 +592,7 @@ function App() {
         onViewSubscription={handleViewSubscription}
         onLogout={handleLogout}
         entities={entities}
+        subscriptionStatus={subscriptionStatus}
       />
     );
   }
@@ -480,7 +608,8 @@ function App() {
   }
   
   // Also show login if explicitly requested (but not if user is logged in and on home page)
-  if (showLogin && currentPage !== 'icons' && currentPage !== 'home' && !currentUser) {
+  // Don't show login if user just logged in (to prevent showing login screen after successful login)
+  if (showLogin && currentPage !== 'icons' && currentPage !== 'home' && !currentUser && !isLoadingAuth) {
     return (
       <div className="App">
         <Login onLoginSuccess={handleLoginSuccess} />
@@ -499,6 +628,16 @@ function App() {
         type="warning"
         onConfirm={confirmDeactivate}
         onCancel={cancelDeactivate}
+      />
+      <ConfirmDialog
+        isOpen={showPermanentDeleteDialog}
+        title="Permanently Delete Profile"
+        message={`Are you sure you want to permanently delete "${entityToPermanentlyDelete?.entityName || 'this profile'}"? This action cannot be undone. All data including analytics will be permanently removed.`}
+        confirmText="Delete Permanently"
+        cancelText="Cancel"
+        type="danger"
+        onConfirm={confirmPermanentDelete}
+        onCancel={cancelPermanentDelete}
       />
       <div className="container">
         <nav className="app-nav">
@@ -548,6 +687,7 @@ function App() {
               onEditEntity={handleEditEntity}
               onDeleteEntity={handleDeleteEntity}
               onReactivateEntity={handleReactivateEntity}
+              onPermanentDeleteEntity={handlePermanentDeleteEntity}
             />
           </>
         )}
@@ -580,6 +720,7 @@ function App() {
                     onBack={handleBackToList}
                     onEdit={(entity) => handleEditEntity(entity)}
                     onDelete={handleDeleteEntity}
+                    onPermanentDelete={handlePermanentDeleteEntity}
                     onViewDashboard={handleViewDashboard}
                     onLogout={handleLogout}
                     currentUser={currentUser}
@@ -604,11 +745,26 @@ function App() {
             )}
 
             {currentPage === 'subscription' && (
-              <Subscription
-                onBack={() => setCurrentPage('home')}
-                currentUser={currentUser}
-                onLogout={handleLogout}
-              />
+                <Subscription
+                  onBack={() => setCurrentPage('home')}
+                  currentUser={currentUser}
+                  onLogout={handleLogout}
+                  onSubscriptionSuccess={() => {
+                    // Refresh subscription status and redirect to home
+                    const refreshStatus = async () => {
+                      try {
+                        const { getSubscriptionStatus, clearSubscriptionStatusCache } = await import('./utils/subscription');
+                        clearSubscriptionStatusCache(currentUser.id); // Clear cache before fetching
+                        const status = await getSubscriptionStatus(currentUser.id, true); // Force refresh
+                        setSubscriptionStatus(status);
+                      } catch (err) {
+                        console.error('Error refreshing subscription status:', err);
+                      }
+                    };
+                    refreshStatus();
+                    setCurrentPage('home');
+                  }}
+                />
             )}
       </div>
     </div>

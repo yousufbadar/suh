@@ -1,6 +1,7 @@
 // Authentication utilities using Supabase Auth
 
 import { supabase } from '../lib/supabase';
+import { startTrial } from './subscription';
 
 // Register new user with Supabase
 export const registerUser = async (email, password, username) => {
@@ -26,6 +27,15 @@ export const registerUser = async (email, password, username) => {
 
   if (error) {
     throw new Error(error.message || 'Registration failed');
+  }
+  
+  // Start trial on signup day (trial period begins the day user signs up)
+  if (data.user?.id) {
+    try {
+      await startTrial(data.user.id);
+    } catch (trialErr) {
+      console.warn('Trial start on signup failed (user still registered):', trialErr);
+    }
   }
   
   // Extract username/name from user metadata

@@ -117,7 +117,7 @@ function ProfileDashboard({ entityId, onBack, onLogout, currentUser }) {
   // Platform color mapping
   const platformColors = {
     facebook: '#1877f2',
-    twitter: '#1da1f2',
+    twitter: '#000000',
     instagram: '#e4405f',
     linkedin: '#0077b5',
     youtube: '#ff0000',

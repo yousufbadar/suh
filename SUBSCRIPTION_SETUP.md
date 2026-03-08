@@ -29,7 +29,10 @@ The subscription system includes:
    ```env
    REACT_APP_SQUARE_APPLICATION_ID=your_square_application_id
    REACT_APP_SQUARE_LOCATION_ID=your_square_location_id
+   REACT_APP_BACKEND_API_URL=http://localhost:3001
    ```
+   
+   **Note**: `REACT_APP_BACKEND_API_URL` is required for actual payment processing. Without it, payments will only be simulated.
 
 ---
 
@@ -49,9 +52,11 @@ The subscription system includes:
 
 ---
 
-## Step 3: Backend API Setup (Required for Production)
+## Step 3: Backend API Setup (Required for Real Payments)
 
-**Important**: The current implementation simulates payment processing. For production, you **must** create a backend API to securely process payments.
+**Important**: The current implementation simulates payment processing. For real payments to show up in Square, you **must** create a backend API to securely process payments.
+
+**Quick Start**: See `backend-example.js` in the project root for a ready-to-use backend server.
 
 ### Why a Backend is Required
 
@@ -71,70 +76,69 @@ The subscription system includes:
    - Handles Square webhook events
    - Updates subscription status based on payment events
 
+### Quick Setup (Using Example Backend)
+
+1. **Install Backend Dependencies**
+   ```bash
+   npm install express squareup dotenv
+   ```
+
+2. **Create Backend .env File**
+   Create a `.env` file in your project root (or in a separate backend folder):
+   ```env
+   SQUARE_ACCESS_TOKEN=your_square_access_token_here
+   SQUARE_ENVIRONMENT=sandbox
+   PORT=3001
+   ALLOWED_ORIGIN=http://localhost:3000
+   ```
+
+3. **Run the Backend Server**
+   ```bash
+   node backend-example.js
+   ```
+
+4. **Update Frontend .env**
+   Make sure your React app's `.env` includes:
+   ```env
+   REACT_APP_BACKEND_API_URL=http://localhost:3001
+   ```
+
+5. **Test the Payment**
+   - The backend will process payments through Square
+   - Payments will appear in your Square Dashboard
+   - Check the backend console for payment logs
+
 ### Example Backend Implementation (Node.js/Express)
 
-```javascript
-// server.js
-const express = require('express');
-const { Client, Environment } = require('squareup');
+See `backend-example.js` in the project root for a complete, ready-to-use implementation.
 
-const app = express();
-app.use(express.json());
-
-const squareClient = new Client({
-  accessToken: process.env.SQUARE_ACCESS_TOKEN,
-  environment: Environment.Sandbox, // or Environment.Production
-});
-
-app.post('/api/process-subscription', async (req, res) => {
-  const { userId, paymentToken, amount, isTrialStart } = req.body;
-  
-  try {
-    if (!isTrialStart) {
-      // Process payment for subscription
-      const { result } = await squareClient.paymentsApi.createPayment({
-        sourceId: paymentToken,
-        amountMoney: {
-          amount: amount, // 999 = $9.99
-          currency: 'USD',
-        },
-        idempotencyKey: crypto.randomUUID(),
-      });
-      
-      if (result.payment.status !== 'COMPLETED') {
-        throw new Error('Payment not completed');
-      }
-    }
-    
-    // Update subscription in database
-    // ... database update logic ...
-    
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Payment error:', error);
-    res.status(400).json({ success: false, error: error.message });
-  }
-});
-
-app.listen(3001, () => {
-  console.log('Server running on port 3001');
-});
-```
+The backend:
+- ✅ Processes payments securely using Square's API
+- ✅ Handles payment errors and declines
+- ✅ Returns payment IDs for tracking
+- ✅ Includes CORS configuration
+- ✅ Has proper error handling
 
 ---
 
-## Step 4: Update Frontend Code
+## Step 4: Frontend Code (Already Configured)
 
-The frontend code is already set up, but you need to:
+The frontend code is already set up and will automatically call your backend API if `REACT_APP_BACKEND_API_URL` is configured.
 
-1. **Update `src/utils/subscription.js`**
-   - Uncomment the backend API call in `processSubscription` function
-   - Update the API URL to point to your backend
+**What happens:**
+- ✅ If `REACT_APP_BACKEND_API_URL` is set → Payments are processed through Square
+- ⚠️ If `REACT_APP_BACKEND_API_URL` is not set → Payments are simulated (won't appear in Square)
 
-2. **Test the Integration**
-   - Use Square sandbox test cards
-   - Test the subscription flow
-   - Verify subscription status updates
+**To enable real payments:**
+1. Set `REACT_APP_BACKEND_API_URL=http://localhost:3001` in your React app's `.env`
+2. Make sure your backend server is running
+3. Restart your React development server
+
+**Test the Integration:**
+- Use Square sandbox test cards (see Step 5)
+- Test the subscription flow
+- Verify payments appear in Square Dashboard
+- Check backend console for payment logs
 
 ---
 

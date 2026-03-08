@@ -45,6 +45,15 @@ Supabase provides built-in OAuth support for multiple providers. Once configured
    - Paste your **Client ID** and **Client Secret**
    - Click "Save"
 
+6. **Configure Redirect URLs in Supabase** ⚠️ **CRITICAL STEP**
+   - Go to **Authentication** → **URL Configuration**
+   - Under **Redirect URLs**, add your application URLs:
+     - For local development: `http://localhost:3000` (or your dev port)
+     - For production: `https://yourdomain.com`
+   - Make sure to add the exact URL where your app is hosted
+   - Click "Save"
+   - **Note:** The redirect URL must match exactly (including protocol http/https and port)
+
 ---
 
 ## Step 2: Find Your Supabase Project Reference
@@ -103,6 +112,22 @@ You'll need this for the callback URL in Google OAuth.
 - Verify Supabase client is properly initialized
 - Make sure your `.env` file has correct Supabase credentials
 - Check that popup blockers aren't blocking the redirect
+- **Most common issue:** Make sure your redirect URL is whitelisted in Supabase Dashboard → Authentication → URL Configuration → Redirect URLs
+- Check the browser console for the exact redirect URL being used (it will be logged)
+- The redirect URL must match exactly, including:
+  - Protocol (http:// or https://)
+  - Domain (localhost or your domain)
+  - Port (if using non-standard port like :3000)
+  - Path (usually just `/` or your app path)
+
+### Issue: "Redirect URL not whitelisted" or "redirect_uri_mismatch"
+**Solution:**
+1. Check the browser console - it will log the redirect URL being used
+2. Go to Supabase Dashboard → Authentication → URL Configuration
+3. Add the exact URL shown in the console to the Redirect URLs list
+4. Make sure there are no trailing slashes or extra characters
+5. Save and wait a few seconds for changes to propagate
+6. Try again
 
 ---
 

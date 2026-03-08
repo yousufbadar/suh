@@ -4,7 +4,6 @@ import { getEntityByUUID, trackQRScan, trackSocialClick, trackCustomLinkClick } 
 import { getTheme, applyTheme } from '../utils/theme';
 import {
   FaFacebook,
-  FaTwitter,
   FaInstagram,
   FaLinkedin,
   FaYoutube,
@@ -23,10 +22,11 @@ import {
   FaFlickr,
   FaSpinner,
 } from 'react-icons/fa';
+import { FaXTwitter } from 'react-icons/fa6';
 
 const socialMediaPlatforms = {
   facebook: { name: 'Facebook', icon: FaFacebook, color: '#1877f2' },
-  twitter: { name: 'Twitter', icon: FaTwitter, color: '#1da1f2' },
+  twitter: { name: 'X', icon: FaXTwitter, color: '#000000' },
   instagram: { name: 'Instagram', icon: FaInstagram, color: '#e4405f' },
   linkedin: { name: 'LinkedIn', icon: FaLinkedin, color: '#0077b5' },
   youtube: { name: 'YouTube', icon: FaYoutube, color: '#ff0000' },
@@ -87,28 +87,94 @@ function SocialMediaIconsPage({ uuid }) {
     loadEntity();
   }, [uuid]);
 
-  const handleSocialClick = async (platform, url, entityId) => {
+  const handleSocialClick = async (e, platform, url, entityId) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    console.log(`🔗 Icon clicked: ${platform}`, { url, entityId, entity });
+    
+    // Validate URL before opening
+    if (!url || typeof url !== 'string' || url.trim() === '') {
+      console.warn(`⚠️ No URL provided for ${platform}`);
+      return;
+    }
+
+    // Ensure URL has protocol
+    let validUrl = url.trim();
+    if (!validUrl.startsWith('http://') && !validUrl.startsWith('https://')) {
+      validUrl = 'https://' + validUrl;
+    }
+
+    try {
+      // Validate URL format
+      new URL(validUrl);
+    } catch (error) {
+      console.error(`❌ Invalid URL for ${platform}:`, validUrl, error);
+      return;
+    }
+
+    console.log(`✅ Opening URL: ${validUrl}`);
+
     if (!entity?.uuid || !entity?.active) {
-      window.open(url, '_blank', 'noopener,noreferrer');
+      const newWindow = window.open(validUrl, '_blank', 'noopener,noreferrer');
+      if (!newWindow) {
+        console.error('❌ Popup blocked. Please allow popups for this site.');
+      }
       return;
     }
 
     // Track the click (optimized: skip reload to reduce egress)
     trackSocialClick(entityId, platform).catch(err => console.error('Error tracking click:', err));
     // Open in new tab immediately
-    window.open(url, '_blank', 'noopener,noreferrer');
+    const newWindow = window.open(validUrl, '_blank', 'noopener,noreferrer');
+    if (!newWindow) {
+      console.error('❌ Popup blocked. Please allow popups for this site.');
+    }
   };
 
-  const handleCustomLinkClick = async (customLinkIndex, url, entityId) => {
+  const handleCustomLinkClick = async (e, customLinkIndex, url, entityId) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    console.log(`🔗 Custom link clicked: ${customLinkIndex}`, { url, entityId, entity });
+    
+    // Validate URL before opening
+    if (!url || typeof url !== 'string' || url.trim() === '') {
+      console.warn(`⚠️ No URL provided for custom link ${customLinkIndex}`);
+      return;
+    }
+
+    // Ensure URL has protocol
+    let validUrl = url.trim();
+    if (!validUrl.startsWith('http://') && !validUrl.startsWith('https://')) {
+      validUrl = 'https://' + validUrl;
+    }
+
+    try {
+      // Validate URL format
+      new URL(validUrl);
+    } catch (error) {
+      console.error(`❌ Invalid URL for custom link ${customLinkIndex}:`, validUrl, error);
+      return;
+    }
+
+    console.log(`✅ Opening URL: ${validUrl}`);
+
     if (!entity?.uuid || !entity?.active) {
-      window.open(url, '_blank', 'noopener,noreferrer');
+      const newWindow = window.open(validUrl, '_blank', 'noopener,noreferrer');
+      if (!newWindow) {
+        console.error('❌ Popup blocked. Please allow popups for this site.');
+      }
       return;
     }
 
     // Track the click (optimized: skip reload to reduce egress)
     trackCustomLinkClick(entityId, customLinkIndex).catch(err => console.error('Error tracking click:', err));
     // Open in new tab immediately
-    window.open(url, '_blank', 'noopener,noreferrer');
+    const newWindow = window.open(validUrl, '_blank', 'noopener,noreferrer');
+    if (!newWindow) {
+      console.error('❌ Popup blocked. Please allow popups for this site.');
+    }
   };
 
   if (loading) {
@@ -165,13 +231,20 @@ function SocialMediaIconsPage({ uuid }) {
             const Icon = platformData.icon;
             const url = entity.socialMedia[platform];
 
+            // Only render button if URL exists and is valid
+            if (!url || typeof url !== 'string' || url.trim() === '') {
+              return null;
+            }
+
             return (
               <button
                 key={platform}
-                onClick={() => handleSocialClick(platform, url, entity.id)}
+                onClick={(e) => handleSocialClick(e, platform, url, entity.id)}
                 className="social-icon-button"
                 style={{ color: platformData.color }}
                 title={platformData.name}
+                type="button"
+                aria-label={`Open ${platformData.name}`}
               >
                 <Icon
                   className="social-icon-svg"
@@ -180,24 +253,35 @@ function SocialMediaIconsPage({ uuid }) {
               </button>
             );
           })}
-          {customLinks.map((customLink, index) => (
-            <button
-              key={`custom-${index}`}
-              onClick={() => handleCustomLinkClick(index, customLink.link, entity.id)}
-              className="social-icon-button custom-link-button"
-              title={customLink.name}
-            >
-              {customLink.icon ? (
-                <img 
-                  src={customLink.icon} 
-                  alt={`${customLink.name} icon`}
-                  className="custom-link-icon-image-page"
-                />
-              ) : (
-                <span className="custom-link-icon-placeholder">{customLink.name.charAt(0)}</span>
-              )}
-            </button>
-          ))}
+          {customLinks.map((customLink, index) => {
+            // Only render button if link exists and is valid
+            if (!customLink?.link || typeof customLink.link !== 'string' || customLink.link.trim() === '') {
+              return null;
+            }
+
+            return (
+              <button
+                key={`custom-${index}`}
+                onClick={(e) => handleCustomLinkClick(e, index, customLink.link, entity.id)}
+                className="social-icon-button custom-link-button"
+                title={customLink.name}
+                type="button"
+                aria-label={`Open ${customLink.name}`}
+              >
+                {customLink.icon ? (
+                  <img 
+                    src={customLink.icon} 
+                    alt={`${customLink.name} icon`}
+                    className="custom-link-icon-image-page"
+                  />
+                ) : (
+                  <span className="custom-link-icon-placeholder">
+                    {customLink.name?.charAt(0) || '?'}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>

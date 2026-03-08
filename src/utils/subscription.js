@@ -1,15 +1,25 @@
 // Subscription management utilities
 
 import { supabase } from '../lib/supabase';
+import {
+  logSubscriptionEvent,
+  recordPayment,
+  updateSubscriptionWithPayment,
+} from './subscriptionTracking';
 
 // eslint-disable-next-line no-unused-vars
 const SUBSCRIPTION_PRICE = 999; // $9.99 in cents (for backend API use)
 const TRIAL_DAYS = 30;
 
+// Cache for getSubscriptionStatus to limit API calls and reduce egress
+let subscriptionStatusCache = new Map();
+let lastSubscriptionStatusCall = new Map();
+const SUBSCRIPTION_STATUS_CACHE_DURATION = 60000; // 60 seconds (1 minute)
+
 /**
- * Get subscription status for a user
+ * Get subscription status for a user (cached to reduce egress)
  */
-export const getSubscriptionStatus = async (userId) => {
+export const getSubscriptionStatus = async (userId, forceRefresh = false) => {
   try {
     if (!supabase || !supabase.from) {
       console.warn('⚠️  Supabase not configured');
@@ -21,61 +31,120 @@ export const getSubscriptionStatus = async (userId) => {
       };
     }
 
+    // Check cache first (unless force refresh is requested)
+    const now = Date.now();
+    if (!forceRefresh && subscriptionStatusCache.has(userId) && lastSubscriptionStatusCall.has(userId)) {
+      const timeSinceLastCall = now - lastSubscriptionStatusCall.get(userId);
+      if (timeSinceLastCall < SUBSCRIPTION_STATUS_CACHE_DURATION) {
+        const cached = subscriptionStatusCache.get(userId);
+        console.log(`📦 Using cached subscription status (${Math.round((SUBSCRIPTION_STATUS_CACHE_DURATION - timeSinceLastCall) / 1000)}s remaining)`);
+        return cached;
+      }
+    }
+
+    // Only select needed fields to minimize egress
     const { data, error } = await supabase
       .from('subscriptions')
-      .select('*')
+      .select('is_active, trial_start_date, subscription_end_date, plan_type, status, last_payment_date, next_billing_date, billing_cycle')
       .eq('user_id', userId)
       .single();
 
     if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
       console.error('Error fetching subscription:', error);
       return {
+        hasSubscriptionRecord: false,
         isActive: false,
         trialActive: false,
+        trialDaysRemaining: 0,
         trialStartDate: null,
         subscriptionEndDate: null,
+        lastPaymentDate: null,
+        nextBillingDate: null,
+        billingCycle: 'monthly',
       };
     }
 
     if (!data) {
-      // No subscription found - user can start trial
+      // No subscription found - trial will start on signup/first login
       return {
+        hasSubscriptionRecord: false,
         isActive: false,
         trialActive: false,
+        trialDaysRemaining: 0,
         trialStartDate: null,
         subscriptionEndDate: null,
+        lastPaymentDate: null,
+        nextBillingDate: null,
+        billingCycle: 'monthly',
       };
     }
 
-    const now = new Date();
+    const currentDate = new Date();
     const trialStartDate = data.trial_start_date ? new Date(data.trial_start_date) : null;
     const subscriptionEndDate = data.subscription_end_date ? new Date(data.subscription_end_date) : null;
 
-    // Check if trial is active
+    // Check if trial is active and compute remaining days
     let trialActive = false;
+    let trialDaysRemaining = 0;
     if (trialStartDate && !data.is_active) {
-      const daysSinceTrialStart = Math.floor((now - trialStartDate) / (1000 * 60 * 60 * 24));
+      const daysSinceTrialStart = Math.floor((currentDate - trialStartDate) / (1000 * 60 * 60 * 24));
       trialActive = daysSinceTrialStart < TRIAL_DAYS;
+      trialDaysRemaining = Math.max(0, TRIAL_DAYS - daysSinceTrialStart);
     }
 
     // Check if subscription is active
-    const isActive = data.is_active && subscriptionEndDate && subscriptionEndDate > now;
+    const isActive = data.is_active && subscriptionEndDate && subscriptionEndDate > currentDate;
 
-    return {
+    const status = {
+      hasSubscriptionRecord: true,
       isActive,
       trialActive,
+      trialDaysRemaining,
       trialStartDate: trialStartDate?.toISOString() || null,
       subscriptionEndDate: subscriptionEndDate?.toISOString() || null,
       planType: data.plan_type || 'pro',
+      lastPaymentDate: data.last_payment_date || null,
+      nextBillingDate: data.next_billing_date || null,
+      billingCycle: data.billing_cycle || 'monthly',
     };
+
+    // Cache the result
+    subscriptionStatusCache.set(userId, status);
+    lastSubscriptionStatusCall.set(userId, now);
+
+    return status;
   } catch (error) {
     console.error('Error getting subscription status:', error);
-    return {
+    const defaultStatus = {
+      hasSubscriptionRecord: false,
       isActive: false,
       trialActive: false,
+      trialDaysRemaining: 0,
       trialStartDate: null,
       subscriptionEndDate: null,
+      lastPaymentDate: null,
+      nextBillingDate: null,
+      billingCycle: 'monthly',
     };
+    // Cache error result too (shorter duration) to prevent repeated failed calls
+    const errorCacheTime = Date.now();
+    subscriptionStatusCache.set(userId, defaultStatus);
+    lastSubscriptionStatusCall.set(userId, errorCacheTime);
+    return defaultStatus;
+  }
+};
+
+/**
+ * Clear subscription status cache for a user (call after subscription changes)
+ */
+export const clearSubscriptionStatusCache = (userId) => {
+  if (userId) {
+    subscriptionStatusCache.delete(userId);
+    lastSubscriptionStatusCall.delete(userId);
+  } else {
+    // Clear all cache
+    subscriptionStatusCache.clear();
+    lastSubscriptionStatusCall.clear();
   }
 };
 
@@ -98,7 +167,7 @@ export const startTrial = async (userId) => {
         trial_start_date: trialStartDate.toISOString(),
         created_at: new Date().toISOString(),
       })
-      .select()
+      .select('id, user_id, plan_type, is_active, trial_start_date, subscription_end_date, status')
       .single();
 
     if (error) {
@@ -128,6 +197,27 @@ export const processSubscription = async (userId, paymentToken, isTrialStart = f
     // 2. Backend processes payment with Square using the access token
     // 3. Backend creates subscription record
     // For now, we'll simulate the subscription creation
+    
+    // TODO: In production, call your backend API to process the actual payment
+    // The backend should handle payment declines and return appropriate errors
+    // For now, we simulate payment processing
+    // NOTE: In production, payment declines will be handled by the backend API
+    // and this function should throw an error if payment fails
+    
+    // IMPORTANT: Square's tokenize() only validates card format, not payment processing
+    // Payment declines are detected when you actually charge the card using Square's Payments API
+    // This must be done on your backend server, not in the frontend
+    // 
+    // Example backend implementation:
+    // const response = await fetch('/api/process-payment', {
+    //   method: 'POST',
+    //   headers: { 'Content-Type': 'application/json' },
+    //   body: JSON.stringify({ paymentToken, amount: SUBSCRIPTION_PRICE })
+    // });
+    // const paymentResult = await response.json();
+    // if (!paymentResult.success) {
+    //   throw new Error(paymentResult.error || 'Payment was declined');
+    // }
 
     const now = new Date();
     let subscriptionData = {
@@ -157,52 +247,144 @@ export const processSubscription = async (userId, paymentToken, isTrialStart = f
       subscriptionData.subscription_end_date = subscriptionEndDate.toISOString();
     }
 
-    // Check if subscription already exists
+    // Check if subscription already exists (only select id to minimize egress)
     const { data: existing } = await supabase
       .from('subscriptions')
-      .select('*')
+      .select('id')
       .eq('user_id', userId)
-      .single();
+      .maybeSingle();
 
     let result;
     if (existing) {
-      // Update existing subscription
+      // Update existing subscription (only return essential fields)
       const { data, error } = await supabase
         .from('subscriptions')
         .update(subscriptionData)
         .eq('user_id', userId)
-        .select()
+        .select('id, user_id, plan_type, is_active, trial_start_date, subscription_end_date, status')
         .single();
 
       if (error) throw error;
       result = data;
+      
+      // Clear cache after update
+      clearSubscriptionStatusCache(userId);
+
+      // Log subscription update event (non-blocking to avoid slowing down subscription creation)
+      logSubscriptionEvent(
+        result.id,
+        userId,
+        'user_action',
+        isTrialStart ? 'trial_started' : 'subscription_activated',
+        {
+          isTrialStart,
+          planType: subscriptionData.plan_type,
+          isActive: subscriptionData.is_active,
+        }
+      ).catch(err => console.error('Error logging subscription event (non-blocking):', err));
     } else {
-      // Create new subscription
+      // Create new subscription (only return essential fields)
       const { data, error } = await supabase
         .from('subscriptions')
         .insert(subscriptionData)
-        .select()
+        .select('id, user_id, plan_type, is_active, trial_start_date, subscription_end_date, status')
         .single();
 
       if (error) throw error;
       result = data;
+      
+      // Clear cache after creation
+      clearSubscriptionStatusCache(userId);
+
+      // Log subscription creation event (non-blocking to avoid slowing down subscription creation)
+      logSubscriptionEvent(
+        result.id,
+        userId,
+        'user_action',
+        isTrialStart ? 'trial_started' : 'subscription_created',
+        {
+          isTrialStart,
+          planType: subscriptionData.plan_type,
+          isActive: subscriptionData.is_active,
+        }
+      ).catch(err => console.error('Error logging subscription event (non-blocking):', err));
     }
 
-    // TODO: In production, call your backend API to process the actual payment
-    // const response = await fetch('/api/process-subscription', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({
-    //     userId,
-    //     paymentToken,
-    //     amount: SUBSCRIPTION_PRICE,
-    //     isTrialStart,
-    //   }),
-    // });
-    // const paymentResult = await response.json();
-    // if (!paymentResult.success) {
-    //   throw new Error(paymentResult.error || 'Payment processing failed');
-    // }
+    // If this is a paid subscription (not trial), record the payment (non-blocking)
+    if (!isTrialStart && paymentToken) {
+      // Run payment recording asynchronously to avoid blocking subscription creation
+      Promise.all([
+        recordPayment(
+          result.id,
+          userId,
+          {
+            paymentId: null, // Will be set by backend in production
+            amountCents: SUBSCRIPTION_PRICE,
+            currency: 'USD',
+            paymentStatus: 'completed',
+            paymentMethod: 'card',
+            paymentToken: paymentToken, // In production, this should be encrypted
+            billingPeriodStart: now.toISOString(),
+            billingPeriodEnd: subscriptionData.subscription_end_date,
+            metadata: {
+              isTrialStart: false,
+              planType: subscriptionData.plan_type,
+            },
+          }
+        ),
+        updateSubscriptionWithPayment(
+          result.id,
+          userId,
+          {
+            transactionDate: now.toISOString(),
+            billingPeriodStart: now.toISOString(),
+            billingPeriodEnd: subscriptionData.subscription_end_date,
+          }
+        )
+      ]).catch(paymentError => {
+        console.error('Error recording payment (non-blocking):', paymentError);
+        // Don't fail the subscription creation if payment logging fails
+      });
+    }
+
+    // Process payment through backend API if configured
+    const backendApiUrl = process.env.REACT_APP_BACKEND_API_URL;
+    
+    if (!isTrialStart && backendApiUrl) {
+      // Call backend API to process payment with Square
+      console.log('💳 Processing payment through backend API...');
+      const response = await fetch(`${backendApiUrl}/api/process-subscription`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId,
+          paymentToken,
+          amount: SUBSCRIPTION_PRICE,
+          isTrialStart,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Payment processing failed' }));
+        throw new Error(errorData.error || `Payment failed: ${response.status} ${response.statusText}`);
+      }
+
+      const paymentResult = await response.json();
+      if (!paymentResult.success) {
+        throw new Error(paymentResult.error || 'Payment processing failed');
+      }
+      
+      console.log('✅ Payment processed successfully through Square:', paymentResult);
+    } else if (!isTrialStart && !backendApiUrl) {
+      // No backend configured - this is a simulation only
+      console.warn('⚠️  Backend API not configured. Payment is being simulated only.');
+      console.warn('⚠️  To process real payments, set REACT_APP_BACKEND_API_URL in your .env file');
+      console.warn('⚠️  See SUBSCRIPTION_SETUP.md for backend implementation details');
+      // For now, we'll still create the subscription record, but log a warning
+      // In production, you should throw an error here instead
+    }
 
     return { success: true, data: result };
   } catch (error) {
@@ -216,24 +398,82 @@ export const processSubscription = async (userId, paymentToken, isTrialStart = f
 
 /**
  * Cancel subscription
+ * Minimal update (is_active + trial_start_date) works with base schema.
+ * Optionally sets status/cancelled_at if those columns exist (migration 005).
  */
-export const cancelSubscription = async (userId) => {
-  try {
-    if (!supabase || !supabase.from) {
-      throw new Error('Database not configured');
-    }
-
-    const { error } = await supabase
-      .from('subscriptions')
-      .update({ is_active: false })
-      .eq('user_id', userId);
-
-    if (error) throw error;
-
-    return { success: true };
-  } catch (error) {
-    console.error('Error canceling subscription:', error);
-    throw error;
+export const cancelSubscription = async (userId, reason = null) => {
+  if (!supabase || !supabase.from) {
+    throw new Error('Database not configured');
   }
+
+  const { data: subscription, error: fetchError } = await supabase
+    .from('subscriptions')
+    .select('id, user_id, is_active, trial_start_date')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (fetchError) {
+    console.error('Error fetching subscription for cancel:', fetchError);
+    throw new Error(fetchError.message || 'Failed to load subscription');
+  }
+
+  if (!subscription) {
+    throw new Error('Subscription not found');
+  }
+
+  const basePayload = {
+    is_active: false,
+    trial_start_date: null,
+  };
+  const fullPayload = {
+    ...basePayload,
+    status: 'cancelled',
+    cancelled_at: new Date().toISOString(),
+    cancellation_reason: reason ?? null,
+    auto_renew: false,
+  };
+
+  const { data, error } = await supabase
+    .from('subscriptions')
+    .update(fullPayload)
+    .eq('user_id', userId)
+    .select('id, user_id, is_active')
+    .maybeSingle();
+
+  if (error) {
+    const msg = error.message || '';
+    if (msg.includes('column') && (msg.includes('does not exist') || msg.includes('status') || msg.includes('cancelled'))) {
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('subscriptions')
+        .update(basePayload)
+        .eq('user_id', userId)
+        .select('id, user_id, is_active')
+        .maybeSingle();
+      if (fallbackError) {
+        console.error('Error updating subscription (cancel fallback):', fallbackError);
+        throw new Error(fallbackError.message || 'Failed to cancel subscription');
+      }
+      clearSubscriptionStatusCache(userId);
+      return { success: true, data: fallbackData };
+    }
+    console.error('Error updating subscription (cancel):', error);
+    throw new Error(error.message || 'Failed to cancel subscription');
+  }
+
+  clearSubscriptionStatusCache(userId);
+
+  try {
+    await logSubscriptionEvent(
+      subscription.id,
+      userId,
+      'user_action',
+      'subscription_cancelled',
+      { reason, cancelledAt: new Date().toISOString() }
+    );
+  } catch (logErr) {
+    console.warn('Error logging cancellation event (non-blocking):', logErr);
+  }
+
+  return { success: true, data };
 };
 

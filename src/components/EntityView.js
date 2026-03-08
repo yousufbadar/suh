@@ -5,7 +5,6 @@ import LocationMap from './LocationMap';
 import { getEntityWithAnalytics, trackSocialClick, trackCustomLinkClick } from '../utils/storage';
 import {
   FaFacebook,
-  FaTwitter,
   FaInstagram,
   FaLinkedin,
   FaYoutube,
@@ -37,10 +36,11 @@ import {
   FaChartBar,
   FaSignOutAlt,
 } from 'react-icons/fa';
+import { FaXTwitter } from 'react-icons/fa6';
 
 const socialMediaPlatforms = {
   facebook: { name: 'Facebook', icon: FaFacebook, color: '#1877f2' },
-  twitter: { name: 'Twitter', icon: FaTwitter, color: '#1da1f2' },
+  twitter: { name: 'X', icon: FaXTwitter, color: '#000000' },
   instagram: { name: 'Instagram', icon: FaInstagram, color: '#e4405f' },
   linkedin: { name: 'LinkedIn', icon: FaLinkedin, color: '#0077b5' },
   youtube: { name: 'YouTube', icon: FaYoutube, color: '#ff0000' },
@@ -59,7 +59,7 @@ const socialMediaPlatforms = {
   flickr: { name: 'Flickr', icon: FaFlickr, color: '#ff0084' },
 };
 
-function EntityView({ entity, onBack, onEdit, onDelete, onViewDashboard, onLogout, currentUser }) {
+function EntityView({ entity, onBack, onEdit, onDelete, onPermanentDelete, onViewDashboard, onLogout, currentUser }) {
   const [copied, setCopied] = useState(false);
   const [currentEntity, setCurrentEntity] = useState(entity);
 
@@ -210,15 +210,28 @@ function EntityView({ entity, onBack, onEdit, onDelete, onViewDashboard, onLogou
               <FaArrowLeft /> Back to Profiles
             </button>
                 <div className="entity-actions">
-                  <button onClick={() => onViewDashboard(currentEntity)} className="dashboard-button">
-                    <FaChartBar /> Dashboard
-                  </button>
-                  <button onClick={() => onEdit(currentEntity)} className="edit-button">
-                    <FaEdit /> Edit
-                  </button>
-                  <button onClick={() => onDelete(currentEntity.id)} className="delete-button">
-                    <FaTrash /> Delete
-                  </button>
+                  {currentEntity.active !== false ? (
+                    <>
+                      <button onClick={() => onViewDashboard(currentEntity)} className="dashboard-button">
+                        <FaChartBar /> Dashboard
+                      </button>
+                      <button onClick={() => onEdit(currentEntity)} className="edit-button">
+                        <FaEdit /> Edit
+                      </button>
+                      <button onClick={() => onDelete(currentEntity.id)} className="delete-button">
+                        <FaTrash /> Archive
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button onClick={() => onEdit(currentEntity)} className="edit-button">
+                        <FaEdit /> Edit
+                      </button>
+                      <button onClick={() => onPermanentDelete && onPermanentDelete(currentEntity.id)} className="delete-button" style={{ backgroundColor: '#dc3545' }}>
+                        <FaTrash /> Delete Permanently
+                      </button>
+                    </>
+                  )}
                 </div>
           </div>
 

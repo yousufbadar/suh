@@ -3,8 +3,7 @@ import './Home.css';
 import { FaHeart, FaQrcode, FaShareAlt, FaUsers, FaRocket, FaSignInAlt, FaList, FaPlus, FaUser, FaChartBar, FaMousePointer, FaSignOutAlt, FaCrown } from 'react-icons/fa';
 import { getTheme, applyTheme } from '../utils/theme';
 import { getEntityWithAnalytics } from '../utils/storage';
-
-function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProfile, onViewDashboard, onLogout, entities, onViewSubscription }) {
+function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProfile, onViewDashboard, onLogout, entities, onViewSubscription, subscriptionStatus }) {
   const [summaryStats, setSummaryStats] = useState({ totalScans: 0, totalClicks: 0, totalProfiles: 0 });
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const isLoadingRef = useRef(false);
@@ -258,7 +257,27 @@ function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProf
                   <FaChartBar /> View Dashboard
                 </button>
               )}
-              {onViewSubscription && currentUser && (
+              {currentUser && subscriptionStatus?.trialActive && subscriptionStatus?.trialDaysRemaining != null && onViewSubscription && (
+                <button 
+                  type="button"
+                  onClick={onViewSubscription}
+                  className="cta-button"
+                  style={{ backgroundColor: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', fontWeight: 600, cursor: 'pointer' }}
+                  title="View subscription and manage trial"
+                >
+                  <FaCrown /> Trial: {subscriptionStatus.trialDaysRemaining} day{subscriptionStatus.trialDaysRemaining !== 1 ? 's' : ''} remaining
+                </button>
+              )}
+              {onViewSubscription && currentUser && subscriptionStatus?.isActive && (
+                <button 
+                  onClick={onViewSubscription} 
+                  className="cta-button"
+                  style={{ backgroundColor: 'transparent', border: '2px solid currentColor' }}
+                >
+                  <FaCrown /> Manage subscription
+                </button>
+              )}
+              {onViewSubscription && currentUser && !subscriptionStatus?.isActive && !subscriptionStatus?.trialActive && (
                 <button 
                   onClick={onViewSubscription} 
                   className="cta-button"
@@ -359,6 +378,33 @@ function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProf
         </div>
       </div>
 
+      <div className="how-it-works">
+        <div className="container">
+          <h2 className="how-it-works-title">
+            <span className="gradient-text">How it works</span> (it's easy, fr) 📖
+          </h2>
+          <div className="steps">
+            <div className="step">
+              <div className="step-number">1</div>
+              <h3>Set Up Your Profile 🎨</h3>
+              <p>Add your brand name, logo, and drop all your social links. Takes like 2 mins, no cap.</p>
+            </div>
+            <div className="step-arrow">✨</div>
+            <div className="step">
+              <div className="step-number">2</div>
+              <h3>Get Your QR Code 📸</h3>
+              <p>Download your personalized QR with a heart in the middle. It's giving ✨aesthetic✨</p>
+            </div>
+            <div className="step-arrow">✨</div>
+            <div className="step">
+              <div className="step-number">3</div>
+              <h3>Share & Watch It Pop Off 🚀</h3>
+              <p>Drop it anywhere and watch people connect with all your socials. That's it. You're done.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="features-section">
         <div className="container">
           <h2 className="features-title">
@@ -403,33 +449,6 @@ function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProf
               <p className="feature-description">
                 Add your logo, brand colors, personality - make it yours. Show the world who you are, fr fr.
               </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="how-it-works">
-        <div className="container">
-          <h2 className="how-it-works-title">
-            <span className="gradient-text">How it works</span> (it's easy, fr) 📖
-          </h2>
-          <div className="steps">
-            <div className="step">
-              <div className="step-number">1</div>
-              <h3>Set Up Your Profile 🎨</h3>
-              <p>Add your brand name, logo, and drop all your social links. Takes like 2 mins, no cap.</p>
-            </div>
-            <div className="step-arrow">✨</div>
-            <div className="step">
-              <div className="step-number">2</div>
-              <h3>Get Your QR Code 📸</h3>
-              <p>Download your personalized QR with a heart in the middle. It's giving ✨aesthetic✨</p>
-            </div>
-            <div className="step-arrow">✨</div>
-            <div className="step">
-              <div className="step-number">3</div>
-              <h3>Share & Watch It Pop Off 🚀</h3>
-              <p>Drop it anywhere and watch people connect with all your socials. That's it. You're done.</p>
             </div>
           </div>
         </div>

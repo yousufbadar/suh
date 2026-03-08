@@ -14,7 +14,7 @@ A modern React application for registering entities with social media links and 
 ## Supported Social Media Platforms
 
 - Facebook
-- Twitter
+- X (formerly Twitter)
 - Instagram
 - LinkedIn
 - YouTube
