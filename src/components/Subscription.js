@@ -37,8 +37,8 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess }) 
     }
     if (!subscriptionStatus && currentUser) return;
 
-    const applicationId = process.env.REACT_APP_SQUARE_APPLICATION_ID?.trim();
-    let locationId = process.env.REACT_APP_SQUARE_LOCATION_ID?.trim();
+    const applicationId = (process.env.REACT_APP_SQUARE_APPLICATION_ID || '').trim().replace(/[\r\n]+/g, '');
+    let locationId = (process.env.REACT_APP_SQUARE_LOCATION_ID || '').trim().replace(/[\r\n]+/g, '');
     
     if (!applicationId) {
       setError('Square payment system is not configured. Please contact support or check your environment variables.');
@@ -218,13 +218,13 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess }) 
           throw new Error('Application ID must be a non-empty string');
         }
 
-        // Ensure both values are strings and trimmed
-        const trimmedApplicationId = String(applicationId).trim();
-        const trimmedLocationId = String(locationId).trim();
+        // Ensure both values are plain strings, trimmed, no stray newlines (e.g. from .env)
+        const trimmedApplicationId = String(applicationId).trim().replace(/[\r\n]+/g, '');
+        const trimmedLocationId = String(locationId).trim().replace(/[\r\n]+/g, '');
 
-        // Final validation - ensure locationId is exactly as Square expects
-        if (!trimmedLocationId || trimmedLocationId.length < 10 || trimmedLocationId.length > 50) {
-          throw new Error(`Invalid Location ID length: "${trimmedLocationId}". Location ID must be between 10 and 50 characters.`);
+        // Square expects location ID to be a non-empty string (format: L + alphanumeric)
+        if (!trimmedLocationId || trimmedLocationId.length < 2) {
+          throw new Error(`Invalid Location ID: value is missing or too short. Use your Sandbox Location ID from Square Developer Console → Locations.`);
         }
 
         console.log('🔧 Initializing Square payments...', {
@@ -249,24 +249,8 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess }) 
           isValidString: typeof trimmedLocationId === 'string' && trimmedLocationId.length > 0
         });
         
-        // Try both API formats - Square SDK might accept either
-        let payments;
-        try {
-          // First try the options object format
-          payments = window.Square.payments(trimmedApplicationId, {
-            locationId: trimmedLocationId,
-          });
-        } catch (firstError) {
-          console.warn('⚠️  First API format failed, trying alternative format...', firstError);
-          // If that fails, try passing locationId as second parameter directly
-          // Note: This is less common but some SDK versions might use it
-          try {
-            payments = window.Square.payments(trimmedApplicationId, trimmedLocationId);
-          } catch (secondError) {
-            console.error('❌ Both API formats failed');
-            throw new Error(`Square SDK initialization failed. LocationId: "${trimmedLocationId}". Error: ${firstError.message || secondError.message}`);
-          }
-        }
+        // Square Web Payments SDK expects: payments(applicationId, locationId) with two string args
+        const payments = window.Square.payments(trimmedApplicationId, trimmedLocationId);
         squarePaymentsRef.current = payments;
 
         setInitStatus('🔧 Creating card payment method...');
