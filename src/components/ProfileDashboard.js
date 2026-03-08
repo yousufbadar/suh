@@ -309,8 +309,8 @@ function ProfileDashboard({ entityId, onBack, onLogout, currentUser }) {
     <div className="profile-dashboard">
       {onLogout && currentUser && (
         <div className="logout-container-dashboard">
-          <button onClick={onLogout} className="logout-button-dashboard" title="Logout">
-            <FaSignOutAlt /> Logout ({currentUser.username || currentUser.name || currentUser.email?.split('@')[0] || 'User'})
+          <button type="button" onClick={onLogout} className="logout-button-dashboard" title="Logout">
+            <FaSignOutAlt /> Logout ({currentUser.name || currentUser.username || currentUser.email?.split('@')[0] || 'User'})
           </button>
         </div>
       )}

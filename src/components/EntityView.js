@@ -200,8 +200,8 @@ function EntityView({ entity, onBack, onEdit, onDelete, onPermanentDelete, onVie
     <div className="entity-view">
       {onLogout && currentUser && (
         <div className="logout-container-view">
-          <button onClick={onLogout} className="logout-button-view" title="Logout">
-            <FaSignOutAlt /> Logout ({currentUser.username || currentUser.name || currentUser.email?.split('@')[0] || 'User'})
+          <button type="button" onClick={onLogout} className="logout-button-view" title="Logout">
+            <FaSignOutAlt /> Logout ({currentUser.name || currentUser.username || currentUser.email?.split('@')[0] || 'User'})
           </button>
         </div>
       )}

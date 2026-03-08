@@ -12,7 +12,7 @@ import Subscription from './components/Subscription';
 import { getEntities, deactivateEntity, reactivateEntity, deleteEntity } from './utils/storage';
 import { getTheme, applyTheme } from './utils/theme';
 import { supabase, isClientValid, testConnection } from './lib/supabase';
-import { getCurrentUser, logoutUser } from './utils/auth';
+import { getCurrentUser, logoutUser, clearUserCache } from './utils/auth';
 import './utils/oauth-diagnostics'; // Load diagnostics helper
 
 function App() {
@@ -375,9 +375,11 @@ function App() {
     }
   };
 
-  const handleLogout = async () => {
+  const handleLogout = async (e) => {
+    if (e?.preventDefault) e.preventDefault();
     try {
       console.log('🔐 Logout initiated...');
+      clearUserCache();
       // Clear user state first so no effect schedules profile fetches with old user id
       currentUserRef.current = null;
       setCurrentUser(null);
@@ -666,11 +668,12 @@ function App() {
           </button>
           {currentUser && (
             <button
+              type="button"
               onClick={handleLogout}
               className="nav-button"
               style={{ marginLeft: 'auto' }}
             >
-              Logout ({currentUser.username || currentUser.name || currentUser.email?.split('@')[0] || 'User'})
+              Logout ({currentUser.name || currentUser.username || currentUser.email?.split('@')[0] || 'User'})
             </button>
           )}
         </nav>

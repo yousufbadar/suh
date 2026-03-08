@@ -162,8 +162,8 @@ function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProf
       <div className="home-page">
         {onLogout && (
           <div className="logout-container-home">
-            <button onClick={onLogout} className="logout-button-home" title="Logout">
-              <FaSignOutAlt /> Logout ({currentUser.username || currentUser.name || currentUser.email?.split('@')[0] || 'User'})
+            <button type="button" onClick={onLogout} className="logout-button-home" title="Logout">
+              <FaSignOutAlt /> Logout ({currentUser.name || currentUser.username || currentUser.email?.split('@')[0] || 'User'})
             </button>
           </div>
         )}

@@ -126,8 +126,15 @@ export const loginUser = async (email, password) => {
   }
 };
 
+// Clear getCurrentUser cache (call on logout so cached user isn't restored)
+export const clearUserCache = () => {
+  lastGetUserCall = null;
+  cachedUserResult = null;
+};
+
 // Logout user
 export const logoutUser = async () => {
+  clearUserCache();
   const { error } = await supabase.auth.signOut();
   if (error) {
     throw new Error(error.message || 'Logout failed');
