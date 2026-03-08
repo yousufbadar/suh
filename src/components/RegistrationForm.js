@@ -35,7 +35,6 @@ import {
   FaTimes,
   FaUserPlus,
   FaExternalLinkAlt,
-  FaSignOutAlt,
 } from 'react-icons/fa';
 
 const socialMediaPlatforms = [

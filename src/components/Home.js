@@ -277,7 +277,19 @@ function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProf
                   <FaCrown /> Manage subscription
                 </button>
               )}
-              {onViewSubscription && currentUser && !subscriptionStatus?.isActive && !subscriptionStatus?.trialActive && (
+              {onViewSubscription && currentUser && subscriptionStatus?.hasSubscriptionRecord && !subscriptionStatus?.isActive && !subscriptionStatus?.trialActive && (
+                <button
+                  onClick={onViewSubscription}
+                  className="cta-button"
+                  style={{ backgroundColor: '#ffd700', color: '#2d3748', border: 'none', flexDirection: 'column', gap: '0.25rem' }}
+                >
+                  <span style={{ fontSize: '0.9rem', opacity: 0.95 }}>Trial Ended</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600 }}>
+                    <FaCrown /> Upgrade
+                  </span>
+                </button>
+              )}
+              {onViewSubscription && currentUser && !subscriptionStatus?.hasSubscriptionRecord && !subscriptionStatus?.isActive && !subscriptionStatus?.trialActive && (
                 <button 
                   onClick={onViewSubscription} 
                   className="cta-button"

@@ -15,6 +15,8 @@ import { supabase, isClientValid, testConnection } from './lib/supabase';
 import { getCurrentUser, logoutUser, clearUserCache } from './utils/auth';
 import './utils/oauth-diagnostics'; // Load diagnostics helper
 
+const TRIAL_RESTRICTED_PAGES = ['list', 'view', 'dashboard', 'register'];
+
 function App() {
   const [currentPage, setCurrentPage] = useState('home'); // 'home', 'list', 'register', 'view', 'edit', 'icons', 'dashboard', 'subscription'
   const [entities, setEntities] = useState([]);
@@ -305,6 +307,15 @@ function App() {
     checkSubscription();
   }, [currentUser]);
 
+  const isTrialEnded = subscriptionStatus?.hasSubscriptionRecord && !subscriptionStatus?.trialActive && !subscriptionStatus?.isActive;
+
+  // Redirect to upgrade when trial has ended and user is on a restricted page
+  useEffect(() => {
+    if (isTrialEnded && currentUser && TRIAL_RESTRICTED_PAGES.includes(currentPage)) {
+      setCurrentPage('subscription');
+    }
+  }, [isTrialEnded, currentPage, currentUser]);
+
   const checkAuth = async () => {
     try {
       const user = await getCurrentUser(false); // Use cache if available (respects 1 minute limit)
@@ -407,7 +418,10 @@ function App() {
 
 
   const handleViewEntity = async (entity) => {
-    // Verify entity belongs to current user if logged in
+    if (isTrialEnded) {
+      setCurrentPage('subscription');
+      return;
+    }
     if (currentUser && entity.userId !== currentUser.id) {
       console.warn('⚠️  Attempted to view entity that does not belong to current user');
       alert('You do not have permission to view this profile.');
@@ -418,12 +432,19 @@ function App() {
   };
 
   const handleViewDashboard = (entity) => {
+    if (isTrialEnded) {
+      setCurrentPage('subscription');
+      return;
+    }
     setSelectedEntity(entity);
     setCurrentPage('dashboard');
   };
 
   const handleEditEntity = async (entity) => {
-    // Verify entity belongs to current user if logged in
+    if (isTrialEnded) {
+      setCurrentPage('subscription');
+      return;
+    }
     if (currentUser && entity.userId !== currentUser.id) {
       console.warn('⚠️  Attempted to edit entity that does not belong to current user');
       alert('You do not have permission to edit this profile.');
@@ -507,22 +528,32 @@ function App() {
   };
 
   const handleRegisterNew = () => {
+    if (isTrialEnded) {
+      setCurrentPage('subscription');
+      return;
+    }
     setEditingEntity(null);
     setCurrentPage('register');
   };
 
   const handleBackToList = () => {
+    if (isTrialEnded) {
+      setCurrentPage('subscription');
+      return;
+    }
     setSelectedEntity(null);
     setEditingEntity(null);
     setCurrentPage('list');
   };
 
   const handleGetStarted = () => {
-    // Check if authenticated before going to list
+    if (currentUser && isTrialEnded) {
+      setCurrentPage('subscription');
+      return;
+    }
     if (currentUser) {
       setCurrentPage('list');
     } else {
-      // Show login if not authenticated
       setShowLogin(true);
       setCurrentPage('list');
     }
@@ -565,18 +596,29 @@ function App() {
       setCurrentPage('list'); // Set to list so login shows for protected page
     };
     const handleViewProfiles = () => {
+      if (isTrialEnded) {
+        setCurrentPage('subscription');
+        return;
+      }
       setCurrentPage('list');
     };
     const handleCreateProfile = () => {
+      if (isTrialEnded) {
+        setCurrentPage('subscription');
+        return;
+      }
       setEditingEntity(null);
       setCurrentPage('register');
     };
     const handleViewDashboardFromHome = (entity) => {
+      if (isTrialEnded) {
+        setCurrentPage('subscription');
+        return;
+      }
       if (entity) {
         setSelectedEntity(entity);
         setCurrentPage('dashboard');
       } else {
-        // If no entity provided, go to profiles list first
         setCurrentPage('list');
       }
     };

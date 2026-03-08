@@ -86,14 +86,16 @@ export const recordPayment = async (subscriptionId, userId, paymentData) => {
       billingPeriodEnd = null,
       metadata = null,
     } = paymentData;
-    
-    // Minimize metadata size - only include essential data to reduce egress
-    const minimalMetadata = metadata ? {
-      planType: metadata.planType,
-      isTrialStart: metadata.isTrialStart,
-    } : null;
 
-    // Only return essential fields to minimize egress
+    // Store metadata: planType, isTrialStart, and full Square response when present (saved in DB)
+    const minimalMetadata = metadata
+      ? {
+          ...(metadata.planType && { planType: metadata.planType }),
+          ...(metadata.isTrialStart !== undefined && { isTrialStart: metadata.isTrialStart }),
+          ...(metadata.squareResponse && { squareResponse: metadata.squareResponse }),
+        }
+      : null;
+
     const { data, error } = await supabase
       .from('subscription_payments')
       .insert({
@@ -108,7 +110,7 @@ export const recordPayment = async (subscriptionId, userId, paymentData) => {
         transaction_date: transactionDate,
         billing_period_start: billingPeriodStart,
         billing_period_end: billingPeriodEnd,
-        metadata: minimalMetadata ? JSON.stringify(minimalMetadata) : null,
+        metadata: minimalMetadata && Object.keys(minimalMetadata).length > 0 ? minimalMetadata : null,
       })
       .select('id, subscription_id, payment_id, amount_cents, currency, payment_status, transaction_date')
       .single();

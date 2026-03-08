@@ -6,19 +6,21 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.79.0",
     "dotenv": "^17.2.3",
+    "es-abstract": "^1.23.3",
     "leaflet": "^1.9.4",
     "qrcode.react": "^3.1.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-icons": "^4.11.0",
     "react-leaflet": "^4.2.1",
-    "react-scripts": "5.0.1"
+    "react-scripts": "^5.0.1",
+    "square": "^44.0.0"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "start": "npx react-scripts start",
+    "build": "npx react-scripts build",
+    "test": "npx react-scripts test",
+    "eject": "npx react-scripts eject"
   },
   "eslintConfig": {
     "extends": [
@@ -38,7 +40,6 @@
     ]
   },
   "overrides": {
-    "react": ">=18.0.0 <19.0.0 || >=19.0.1 <19.1.0 || >=19.1.2 <19.2.0 || >=19.2.1",
-    "react-dom": ">=18.0.0 <19.0.0 || >=19.0.1 <19.1.0 || >=19.1.2 <19.2.0 || >=19.2.1"
+    "es-abstract": "^1.23.3"
   }
 }

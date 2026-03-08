@@ -186,38 +186,45 @@ export const startTrial = async (userId) => {
  * Process subscription payment
  * Note: In production, this should call your backend API which processes the payment securely
  */
-export const processSubscription = async (userId, paymentToken, isTrialStart = false) => {
+export const processSubscription = async (userId, paymentToken, isTrialStart = false, buyerEmailAddress = null, billingAddress = null) => {
   try {
     if (!supabase || !supabase.from) {
       throw new Error('Database not configured');
     }
 
-    // In a real implementation, you would:
-    // 1. Send paymentToken to your backend API
-    // 2. Backend processes payment with Square using the access token
-    // 3. Backend creates subscription record
-    // For now, we'll simulate the subscription creation
-    
-    // TODO: In production, call your backend API to process the actual payment
-    // The backend should handle payment declines and return appropriate errors
-    // For now, we simulate payment processing
-    // NOTE: In production, payment declines will be handled by the backend API
-    // and this function should throw an error if payment fails
-    
-    // IMPORTANT: Square's tokenize() only validates card format, not payment processing
-    // Payment declines are detected when you actually charge the card using Square's Payments API
-    // This must be done on your backend server, not in the frontend
-    // 
-    // Example backend implementation:
-    // const response = await fetch('/api/process-payment', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({ paymentToken, amount: SUBSCRIPTION_PRICE })
-    // });
-    // const paymentResult = await response.json();
-    // if (!paymentResult.success) {
-    //   throw new Error(paymentResult.error || 'Payment was declined');
-    // }
+    const backendApiUrl = process.env.REACT_APP_BACKEND_API_URL;
+    let backendPayment = null;
+
+    if (!isTrialStart && backendApiUrl) {
+      // Call backend first: Square payments.create contract; backend returns full payment response
+      console.log('💳 Processing payment through backend API...');
+      const response = await fetch(`${backendApiUrl}/api/process-subscription`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          paymentToken,
+          amount: SUBSCRIPTION_PRICE,
+          isTrialStart,
+          buyerEmailAddress: buyerEmailAddress || undefined,
+          billingAddress: billingAddress || undefined,
+        }),
+      });
+
+      const paymentResult = await response.json();
+
+      if (!response.ok) {
+        throw new Error(paymentResult.error || `Payment failed: ${response.status} ${response.statusText}`);
+      }
+      if (!paymentResult.success) {
+        throw new Error(paymentResult.error || 'Payment processing failed');
+      }
+
+      backendPayment = paymentResult.payment;
+      console.log('✅ Payment processed successfully through Square:', paymentResult.paymentId);
+    } else if (!isTrialStart && !backendApiUrl) {
+      console.warn('⚠️  Backend API not configured. Payment is being simulated only.');
+    }
 
     const now = new Date();
     let subscriptionData = {
@@ -228,26 +235,18 @@ export const processSubscription = async (userId, paymentToken, isTrialStart = f
     };
 
     if (isTrialStart) {
-      // Starting trial - no payment yet
       subscriptionData.trial_start_date = now.toISOString();
       subscriptionData.is_active = false;
-      
-      // Set subscription end date to 30 days from now (trial period)
       const trialEndDate = new Date(now);
       trialEndDate.setDate(trialEndDate.getDate() + TRIAL_DAYS);
       subscriptionData.subscription_end_date = trialEndDate.toISOString();
     } else {
-      // Converting from trial or new subscription - payment required
-      // In production, verify payment was successful before creating subscription
       subscriptionData.is_active = true;
-      
-      // Set subscription end date to 1 month from now
       const subscriptionEndDate = new Date(now);
       subscriptionEndDate.setMonth(subscriptionEndDate.getMonth() + 1);
       subscriptionData.subscription_end_date = subscriptionEndDate.toISOString();
     }
 
-    // Check if subscription already exists (only select id to minimize egress)
     const { data: existing } = await supabase
       .from('subscriptions')
       .select('id')
@@ -256,134 +255,65 @@ export const processSubscription = async (userId, paymentToken, isTrialStart = f
 
     let result;
     if (existing) {
-      // Update existing subscription (only return essential fields)
       const { data, error } = await supabase
         .from('subscriptions')
         .update(subscriptionData)
         .eq('user_id', userId)
         .select('id, user_id, plan_type, is_active, trial_start_date, subscription_end_date, status')
         .single();
-
       if (error) throw error;
       result = data;
-      
-      // Clear cache after update
       clearSubscriptionStatusCache(userId);
-
-      // Log subscription update event (non-blocking to avoid slowing down subscription creation)
-      logSubscriptionEvent(
-        result.id,
-        userId,
-        'user_action',
-        isTrialStart ? 'trial_started' : 'subscription_activated',
-        {
-          isTrialStart,
-          planType: subscriptionData.plan_type,
-          isActive: subscriptionData.is_active,
-        }
-      ).catch(err => console.error('Error logging subscription event (non-blocking):', err));
+      logSubscriptionEvent(result.id, userId, 'user_action', isTrialStart ? 'trial_started' : 'subscription_activated', {
+        isTrialStart,
+        planType: subscriptionData.plan_type,
+        isActive: subscriptionData.is_active,
+      }).catch(err => console.error('Error logging subscription event (non-blocking):', err));
     } else {
-      // Create new subscription (only return essential fields)
       const { data, error } = await supabase
         .from('subscriptions')
         .insert(subscriptionData)
         .select('id, user_id, plan_type, is_active, trial_start_date, subscription_end_date, status')
         .single();
-
       if (error) throw error;
       result = data;
-      
-      // Clear cache after creation
       clearSubscriptionStatusCache(userId);
-
-      // Log subscription creation event (non-blocking to avoid slowing down subscription creation)
-      logSubscriptionEvent(
-        result.id,
-        userId,
-        'user_action',
-        isTrialStart ? 'trial_started' : 'subscription_created',
-        {
-          isTrialStart,
-          planType: subscriptionData.plan_type,
-          isActive: subscriptionData.is_active,
-        }
-      ).catch(err => console.error('Error logging subscription event (non-blocking):', err));
+      logSubscriptionEvent(result.id, userId, 'user_action', isTrialStart ? 'trial_started' : 'subscription_created', {
+        isTrialStart,
+        planType: subscriptionData.plan_type,
+        isActive: subscriptionData.is_active,
+      }).catch(err => console.error('Error logging subscription event (non-blocking):', err));
     }
 
-    // If this is a paid subscription (not trial), record the payment (non-blocking)
-    if (!isTrialStart && paymentToken) {
-      // Run payment recording asynchronously to avoid blocking subscription creation
+    if (!isTrialStart) {
+      const amountMoney = backendPayment?.amountMoney || backendPayment?.amount_money;
+      const amountCents = amountMoney?.amount != null ? Number(amountMoney.amount) : SUBSCRIPTION_PRICE;
+      const paymentStatus = backendPayment?.status === 'APPROVED' || backendPayment?.status === 'COMPLETED' ? 'completed' : 'pending';
       Promise.all([
-        recordPayment(
-          result.id,
-          userId,
-          {
-            paymentId: null, // Will be set by backend in production
-            amountCents: SUBSCRIPTION_PRICE,
-            currency: 'USD',
-            paymentStatus: 'completed',
-            paymentMethod: 'card',
-            paymentToken: paymentToken, // In production, this should be encrypted
-            billingPeriodStart: now.toISOString(),
-            billingPeriodEnd: subscriptionData.subscription_end_date,
-            metadata: {
-              isTrialStart: false,
-              planType: subscriptionData.plan_type,
-            },
-          }
-        ),
-        updateSubscriptionWithPayment(
-          result.id,
-          userId,
-          {
-            transactionDate: now.toISOString(),
-            billingPeriodStart: now.toISOString(),
-            billingPeriodEnd: subscriptionData.subscription_end_date,
-          }
-        )
+        recordPayment(result.id, userId, {
+          paymentId: backendPayment?.id || null,
+          amountCents,
+          currency: amountMoney?.currency || 'USD',
+          paymentStatus,
+          paymentMethod: 'card',
+          paymentToken: paymentToken || null,
+          transactionDate: now.toISOString(),
+          billingPeriodStart: now.toISOString(),
+          billingPeriodEnd: subscriptionData.subscription_end_date,
+          metadata: {
+            isTrialStart: false,
+            planType: subscriptionData.plan_type,
+            ...(backendPayment && { squareResponse: backendPayment }),
+          },
+        }),
+        updateSubscriptionWithPayment(result.id, userId, {
+          transactionDate: now.toISOString(),
+          billingPeriodStart: now.toISOString(),
+          billingPeriodEnd: subscriptionData.subscription_end_date,
+        }),
       ]).catch(paymentError => {
         console.error('Error recording payment (non-blocking):', paymentError);
-        // Don't fail the subscription creation if payment logging fails
       });
-    }
-
-    // Process payment through backend API if configured
-    const backendApiUrl = process.env.REACT_APP_BACKEND_API_URL;
-    
-    if (!isTrialStart && backendApiUrl) {
-      // Call backend API to process payment with Square
-      console.log('💳 Processing payment through backend API...');
-      const response = await fetch(`${backendApiUrl}/api/process-subscription`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId,
-          paymentToken,
-          amount: SUBSCRIPTION_PRICE,
-          isTrialStart,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Payment processing failed' }));
-        throw new Error(errorData.error || `Payment failed: ${response.status} ${response.statusText}`);
-      }
-
-      const paymentResult = await response.json();
-      if (!paymentResult.success) {
-        throw new Error(paymentResult.error || 'Payment processing failed');
-      }
-      
-      console.log('✅ Payment processed successfully through Square:', paymentResult);
-    } else if (!isTrialStart && !backendApiUrl) {
-      // No backend configured - this is a simulation only
-      console.warn('⚠️  Backend API not configured. Payment is being simulated only.');
-      console.warn('⚠️  To process real payments, set REACT_APP_BACKEND_API_URL in your .env file');
-      console.warn('⚠️  See SUBSCRIPTION_SETUP.md for backend implementation details');
-      // For now, we'll still create the subscription record, but log a warning
-      // In production, you should throw an error here instead
     }
 
     return { success: true, data: result };

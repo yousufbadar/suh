@@ -627,17 +627,14 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess }) 
     features: [
       'Unlimited profiles',
       'Advanced analytics',
-      'Custom branding',
-      'Priority support',
-      'API access',
-      'Export data',
-      'White-label option'
+      'Custom branding'
     ],
     popular: true
   };
 
   const isSubscribed = subscriptionStatus?.isActive || false;
   const isTrialActive = subscriptionStatus?.trialActive || false;
+  const isTrialEnded = subscriptionStatus?.hasSubscriptionRecord && !subscriptionStatus?.trialActive && !subscriptionStatus?.isActive;
 
   return (
     <div className="subscription-page">
@@ -683,10 +680,12 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess }) 
         )}
         <div className="subscription-title-section">
           <h1 className="subscription-title">
-            {(isSubscribed || isTrialActive) ? 'Subscription summary' : 'Upgrade to Pro'}
+            {isTrialEnded ? 'Trial Ended' : (isSubscribed || isTrialActive) ? 'Subscription summary' : 'Upgrade to Pro'}
           </h1>
           <p className="subscription-subtitle">
-            {isSubscribed ? (
+            {isTrialEnded ? (
+              <>Your free trial has ended. Upgrade to Pro to keep access to all features.</>
+            ) : isSubscribed ? (
               <>You're subscribed to Pro! 🎉</>
             ) : isTrialActive && trialDaysRemaining > 0 ? (
               <>Your <strong>30-day free trial</strong> is active. {trialDaysRemaining} day{trialDaysRemaining !== 1 ? 's' : ''} remaining.</>
