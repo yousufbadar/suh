@@ -17,6 +17,32 @@ import './utils/oauth-diagnostics'; // Load diagnostics helper
 
 const TRIAL_RESTRICTED_PAGES = ['list', 'view', 'dashboard', 'register'];
 
+// When Square payment link redirects here after success, we're in a popup: notify opener and close
+function usePaymentSuccessPopup() {
+  const [isPaymentSuccessPopup, setIsPaymentSuccessPopup] = useState(false);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (window.opener && params.get('payment_success')) {
+      try {
+        window.opener.postMessage(
+          {
+            type: 'SQUARE_PAYMENT_SUCCESS',
+            search: window.location.search,
+            href: window.location.href,
+          },
+          window.location.origin
+        );
+      } catch (e) {
+        console.warn('postMessage to opener failed:', e);
+      }
+      setIsPaymentSuccessPopup(true);
+      const t = setTimeout(() => window.close(), 1500);
+      return () => clearTimeout(t);
+    }
+  }, []);
+  return isPaymentSuccessPopup;
+}
+
 function App() {
   const [currentPage, setCurrentPage] = useState('home'); // 'home', 'list', 'register', 'view', 'edit', 'icons', 'dashboard', 'subscription'
   const [entities, setEntities] = useState([]);
@@ -33,6 +59,7 @@ function App() {
   const [showLogin, setShowLogin] = useState(false);
   const [subscriptionStatus, setSubscriptionStatus] = useState(null);
   const currentUserRef = useRef(null);
+  const isPaymentSuccessPopup = usePaymentSuccessPopup();
 
   // Apply theme on initial mount
   useEffect(() => {
@@ -565,6 +592,16 @@ function App() {
     setCurrentPage('list');
   };
 
+
+  // Payment link success redirect: we're in a popup; show closing message (postMessage already sent in usePaymentSuccessPopup)
+  if (isPaymentSuccessPopup) {
+    return (
+      <div className="App" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', flexDirection: 'column', gap: '1rem' }}>
+        <div>Payment successful.</div>
+        <div style={{ fontSize: '0.9rem', color: '#666' }}>Closing window...</div>
+      </div>
+    );
+  }
 
   // Show loading state while checking authentication (with fallback)
   if (isLoadingAuth) {

@@ -327,6 +327,98 @@ export const processSubscription = async (userId, paymentToken, isTrialStart = f
 };
 
 /**
+ * After user completes payment via Square payment link, redirect lands in popup and posts message.
+ * This records the payment and activates the subscription for the logged-in user.
+ * redirectParams: { search: string } from window.location.search, or object of parsed params
+ */
+export const recordPaymentFromLinkAndActivate = async (userId, redirectParams = {}) => {
+  if (!supabase || !supabase.from) {
+    throw new Error('Database not configured');
+  }
+  const now = new Date();
+  const subscriptionEndDate = new Date(now);
+  subscriptionEndDate.setMonth(subscriptionEndDate.getMonth() + 1);
+  const nextBilling = subscriptionEndDate.toISOString();
+  const transactionDate = now.toISOString();
+
+  const { data: existing } = await supabase
+    .from('subscriptions')
+    .select('id')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  let subscriptionId;
+  if (existing) {
+    subscriptionId = existing.id;
+    const updatePayload = {
+      is_active: true,
+      subscription_end_date: subscriptionEndDate.toISOString(),
+      last_payment_date: transactionDate,
+      next_billing_date: nextBilling,
+      payment_failed_count: 0,
+      status: 'active',
+    };
+    const { error: updateError } = await supabase
+      .from('subscriptions')
+      .update(updatePayload)
+      .eq('id', subscriptionId);
+    if (updateError) throw updateError;
+  } else {
+    const insertPayload = {
+      user_id: userId,
+      plan_type: 'pro',
+      is_active: true,
+      subscription_end_date: subscriptionEndDate.toISOString(),
+      last_payment_date: transactionDate,
+      next_billing_date: nextBilling,
+      status: 'active',
+      created_at: transactionDate,
+    };
+    const { data: inserted, error: insertError } = await supabase
+      .from('subscriptions')
+      .insert(insertPayload)
+      .select('id')
+      .single();
+    if (insertError) throw insertError;
+    subscriptionId = inserted.id;
+  }
+
+  const search = typeof redirectParams === 'string' ? redirectParams : redirectParams.search || '';
+  const paramsObj = {};
+  if (search) {
+    try {
+      const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+      for (const [k, v] of params) paramsObj[k] = v;
+    } catch (_) {}
+  }
+  const paymentResponse = {
+    source: 'payment_link',
+    redirectParams: paramsObj,
+    ...(typeof redirectParams === 'object' && redirectParams.href && { redirectHref: redirectParams.href }),
+  };
+
+  await recordPayment(subscriptionId, userId, {
+    paymentId: paramsObj.checkout_id || paramsObj.order_id || paramsObj.payment_id || `link-${Date.now()}`,
+    amountCents: SUBSCRIPTION_PRICE,
+    currency: 'USD',
+    paymentStatus: 'completed',
+    paymentMethod: 'card',
+    transactionDate,
+    billingPeriodStart: transactionDate,
+    billingPeriodEnd: subscriptionEndDate.toISOString(),
+    metadata: { planType: 'pro', isTrialStart: false, squareResponse: paymentResponse },
+  });
+
+  clearSubscriptionStatusCache(userId);
+  logSubscriptionEvent(subscriptionId, userId, 'payment_processor', 'subscription_activated', {
+    source: 'payment_link',
+    redirectParams: paramsObj,
+  }).catch(err => console.error('Error logging subscription event (non-blocking):', err));
+
+  return { success: true, subscriptionId };
+};
+
+/**
  * Cancel subscription
  * Minimal update (is_active + trial_start_date) works with base schema.
  * Optionally sets status/cancelled_at if those columns exist (migration 005).

@@ -18,12 +18,43 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess }) 
   const [isCancelling, setIsCancelling] = useState(false);
   const [paymentHistory, setPaymentHistory] = useState([]);
   const [loadingPayments, setLoadingPayments] = useState(false);
+  const [showPaymentLinkModal, setShowPaymentLinkModal] = useState(false);
+  const [paymentLinkRecording, setPaymentLinkRecording] = useState(false);
   const cardContainerRef = useRef(null);
   const initializationTimeoutRef = useRef(null);
   const initializationCompleteRef = useRef(false);
   const squarePaymentsRef = useRef(null);
   const validatedLocationIdRef = useRef(null);
   const validatedApplicationIdRef = useRef(null);
+
+  const SQUARE_PAYMENT_LINK_URL = 'https://square.link/u/u7vBITIp';
+
+  // Listen for payment success from Square payment link popup (redirect posts message back)
+  useEffect(() => {
+    const handleMessage = (event) => {
+      if (event.origin !== window.location.origin || event.data?.type !== 'SQUARE_PAYMENT_SUCCESS') return;
+      if (!currentUser?.id) return;
+      setPaymentLinkRecording(true);
+      (async () => {
+        try {
+          const { recordPaymentFromLinkAndActivate, getSubscriptionStatus, clearSubscriptionStatusCache } = await import('../utils/subscription');
+          await recordPaymentFromLinkAndActivate(currentUser.id, { search: event.data.search, href: event.data.href });
+          clearSubscriptionStatusCache(currentUser.id);
+          const status = await getSubscriptionStatus(currentUser.id, true);
+          setSubscriptionStatus(status);
+          setShowPaymentLinkModal(false);
+          if (onSubscriptionSuccess) onSubscriptionSuccess();
+        } catch (err) {
+          console.error('Error recording payment from link:', err);
+          setError(err.message || 'Failed to record payment. Please contact support.');
+        } finally {
+          setPaymentLinkRecording(false);
+        }
+      })();
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [currentUser?.id, onSubscriptionSuccess]);
 
   // Load Square Web Payments SDK only when payment form is shown (not on summary, and not when starting trial only)
   // Trial requires no payment; payment form only for subscribing after trial or converting to paid
@@ -197,7 +228,7 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess }) 
         if (!cardContainerRef.current) {
           console.error('❌ Card container ref not ready after waiting');
           setInitStatus('❌ Card container not found');
-          setError('Payment form container not found. Please refresh the page.');
+          setError(null);
           setIsInitializing(false);
           if (initializationTimeoutRef.current) {
             clearTimeout(initializationTimeoutRef.current);
@@ -672,6 +703,35 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess }) 
         onCancel={handleCancelSubscriptionCancel}
         showCancel={!isCancelling}
       />
+      {showPaymentLinkModal && (
+        <div className="subscription-payment-link-modal-overlay" onClick={() => !paymentLinkRecording && setShowPaymentLinkModal(false)} role="dialog" aria-modal="true" aria-labelledby="payment-link-modal-title">
+          <div className="subscription-payment-link-modal" onClick={e => e.stopPropagation()}>
+            <h2 id="payment-link-modal-title">Complete payment</h2>
+            <p>You&apos;ll complete payment securely in a popup. After payment, the window will close and your subscription will be activated for this account.</p>
+            <p className="subscription-payment-link-modal-note">
+              In your Square dashboard, set the payment link&apos;s success redirect URL to:{' '}
+              <code>{typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname || ''}?payment_success=1` : '...?payment_success=1'}</code>
+            </p>
+            <div className="subscription-payment-link-modal-actions">
+              <button
+                type="button"
+                className="plan-button"
+                style={{ cursor: paymentLinkRecording ? 'wait' : 'pointer' }}
+                disabled={paymentLinkRecording}
+                onClick={() => {
+                  const w = window.open(SQUARE_PAYMENT_LINK_URL, 'squarePayment', 'width=600,height=700,scrollbars=yes');
+                  if (w) w.focus();
+                }}
+              >
+                {paymentLinkRecording ? 'Recording payment...' : 'Continue to payment'}
+              </button>
+              <button type="button" className="back-button-subscription" onClick={() => setShowPaymentLinkModal(false)} disabled={paymentLinkRecording}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="subscription-header">
         {onBack && (
           <button onClick={onBack} className="back-button-subscription">
@@ -693,31 +753,35 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess }) 
               <>Get unlimited access to all Pro features</>
             )}
           </p>
+          {isTrialEnded && (
+            <div style={{ display: 'flex', justifyContent: 'center', width: '100%', marginTop: '1.25rem' }}>
+              <button
+                type="button"
+                onClick={() => setShowPaymentLinkModal(true)}
+                className="plan-button"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  width: 'auto',
+                  padding: '12px 24px',
+                  fontSize: '1rem',
+                  textDecoration: 'none',
+                  background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                  color: '#fff',
+                  border: 'none',
+                  boxShadow: '0 4px 14px rgba(5, 150, 105, 0.4)',
+                  cursor: 'pointer',
+                  borderRadius: '8px',
+                }}
+              >
+                <FaCrown /> Buy subscription
+              </button>
+            </div>
+          )}
         </div>
       </div>
-
-      {error && (
-        <div className="subscription-error">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
-            <span>{error}</span>
-            <button 
-              onClick={() => window.location.reload()} 
-              style={{ 
-                padding: '8px 16px', 
-                background: '#667eea', 
-                color: 'white', 
-                border: 'none', 
-                borderRadius: '6px', 
-                cursor: 'pointer',
-                fontSize: '0.9rem',
-                fontWeight: '600'
-              }}
-            >
-              Refresh Page
-            </button>
-          </div>
-        </div>
-      )}
 
       {(isSubscribed || isTrialActive) ? (
         <div className="subscription-plan-container" style={{ maxWidth: '640px', margin: '0 auto' }}>
@@ -830,7 +894,7 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess }) 
             </div>
           </div>
         </div>
-      ) : (
+      ) : !isTrialEnded ? (
       <div className="subscription-plan-container">
         <div className="subscription-plan-card popular">
           {plan.popular && (
@@ -953,7 +1017,7 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess }) 
             </>
         </div>
       </div>
-      )}
+      ) : null}
 
       <div className="subscription-footer">
         <p className="trial-info">

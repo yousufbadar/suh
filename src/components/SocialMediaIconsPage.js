@@ -283,6 +283,14 @@ function SocialMediaIconsPage({ uuid }) {
             );
           })}
         </div>
+        <a
+          href="https://shareyourhearttoday.com/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="website-link-below-icons"
+        >
+          shareyourhearttoday.com
+        </a>
       </div>
     </div>
   );

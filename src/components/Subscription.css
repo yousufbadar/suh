@@ -339,3 +339,76 @@
   }
 }
 
+/* Payment link modal (opens in popup, success posts message back) */
+.subscription-payment-link-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 1rem;
+}
+.subscription-payment-link-modal {
+  background: var(--card-bg, #fff);
+  color: var(--text-primary, #1a1a1a);
+  border-radius: 12px;
+  padding: 1.5rem 2rem;
+  max-width: 480px;
+  width: 100%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+.subscription-payment-link-modal h2 {
+  margin: 0 0 1rem;
+  font-size: 1.25rem;
+}
+.subscription-payment-link-modal p {
+  margin: 0 0 0.75rem;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  color: var(--text-secondary, #555);
+}
+.subscription-payment-link-modal-note {
+  font-size: 0.85rem;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 0.75rem;
+  border-radius: 8px;
+  word-break: break-all;
+}
+.subscription-payment-link-modal-note code {
+  font-family: monospace;
+  font-size: 0.8rem;
+}
+.subscription-payment-link-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  align-items: center;
+}
+.subscription-payment-link-modal-actions .plan-button {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  border: none;
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  color: #fff;
+}
+.subscription-payment-link-modal-actions .plan-button:disabled {
+  opacity: 0.8;
+  cursor: wait;
+}
+.subscription-payment-link-modal-actions .back-button-subscription {
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--text-primary, #1a1a1a);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+.subscription-payment-link-modal-actions .back-button-subscription:hover {
+  background: rgba(0, 0, 0, 0.12);
+}
+.subscription-payment-link-modal-actions .back-button-subscription:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+

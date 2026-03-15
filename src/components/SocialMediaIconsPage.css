@@ -120,6 +120,20 @@
   align-items: center;
 }
 
+.website-link-below-icons {
+  display: block;
+  margin-top: 32px;
+  text-align: center;
+  font-size: 0.95rem;
+  color: var(--text-secondary, #666);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.website-link-below-icons:hover {
+  color: var(--theme-primary, #667eea);
+}
+
 .social-icon-button {
   position: relative;
   width: 100px;
