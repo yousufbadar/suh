@@ -90,6 +90,59 @@
   margin-bottom: 30px;
 }
 
+.hero-brand-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.hero-brand-text {
+  text-align: left;
+  max-width: 420px;
+}
+
+.hero-heading {
+  margin: 0 0 0.35rem;
+  font-size: clamp(1.5rem, 4vw, 2.25rem);
+  font-weight: 800;
+  line-height: 1.2;
+  color: white;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.hero-tagline {
+  margin: 0;
+  font-size: clamp(0.9rem, 2.2vw, 1.1rem);
+  font-weight: 500;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.95);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.hero-welcome-title {
+  margin-top: 0.5rem;
+}
+
+.hero-logo-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.hero-logo {
+  width: 140px;
+  height: auto;
+  max-height: 140px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 20px rgba(0, 0, 0, 0.2));
+  z-index: 2;
+  position: relative;
+}
+
 .hero-icon {
   font-size: 4.5rem;
   color: #ffd700;
@@ -464,6 +517,14 @@
 }
 
 @media (max-width: 768px) {
+  .hero-brand-row {
+    flex-direction: column;
+  }
+
+  .hero-brand-text {
+    text-align: center;
+  }
+
   .hero-title {
     font-size: 2.5rem;
   }

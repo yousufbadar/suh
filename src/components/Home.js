@@ -169,18 +169,22 @@ function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProf
         )}
         <div className="home-hero">
           <div className="hero-content">
-            <div className="hero-icon-wrapper">
-              <div className="hero-icon">
-                <FaUser />
+            <div className="hero-brand-row">
+              <div className="hero-icon-wrapper hero-logo-wrapper">
+                <img src="/logo.png" alt="Share Your Heart" className="hero-logo" />
+                <div className="floating-emoji">✨</div>
+                <div className="floating-emoji delay-1">💜</div>
+                <div className="floating-emoji delay-2">🔥</div>
               </div>
-              <div className="floating-emoji">✨</div>
-              <div className="floating-emoji delay-1">💜</div>
-              <div className="floating-emoji delay-2">🔥</div>
+              <div className="hero-brand-text">
+                <h1 className="hero-heading">Share your heart today</h1>
+                <p className="hero-tagline">your experience today at this place, for all your friends to see!!!</p>
+              </div>
             </div>
-            <h1 className="hero-title">
+            <h2 className="hero-title hero-welcome-title">
               Welcome back,<br />
               <span className="gradient-text">{currentUser.name || currentUser.username || (currentUser.email ? currentUser.email.split('@')[0] : 'User')}</span>! 👋
-            </h1>
+            </h2>
             <p className="hero-subtitle">
               Manage your profiles and connect with your audience
               <br />
@@ -280,6 +284,7 @@ function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProf
               {onViewSubscription && currentUser && subscriptionStatus?.hasSubscriptionRecord && !subscriptionStatus?.isActive && !subscriptionStatus?.trialActive && (
                 <button
                   onClick={onViewSubscription}
+                  type="button"
                   className="cta-button"
                   style={{ backgroundColor: '#ffd700', color: '#2d3748', border: 'none', flexDirection: 'column', gap: '0.25rem' }}
                 >
@@ -292,6 +297,7 @@ function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProf
               {onViewSubscription && currentUser && !subscriptionStatus?.hasSubscriptionRecord && !subscriptionStatus?.isActive && !subscriptionStatus?.trialActive && (
                 <button 
                   onClick={onViewSubscription} 
+                  type="button"
                   className="cta-button"
                   style={{ backgroundColor: '#ffd700', color: '#2d3748', border: 'none' }}
                 >
@@ -361,17 +367,18 @@ function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProf
     <div className="home-page">
       <div className="home-hero">
         <div className="hero-content">
-          <div className="hero-icon-wrapper">
-            <div className="hero-icon">
-              <FaHeart />
+          <div className="hero-brand-row">
+            <div className="hero-icon-wrapper hero-logo-wrapper">
+              <img src="/logo.png" alt="Share Your Heart" className="hero-logo" />
+              <div className="floating-emoji">✨</div>
+              <div className="floating-emoji delay-1">💜</div>
+              <div className="floating-emoji delay-2">🔥</div>
             </div>
-            <div className="floating-emoji">✨</div>
-            <div className="floating-emoji delay-1">💜</div>
-            <div className="floating-emoji delay-2">🔥</div>
+            <div className="hero-brand-text">
+              <h1 className="hero-heading">Share your heart today</h1>
+              <p className="hero-tagline">your experience today at this place, for all your friends to see!!!</p>
+            </div>
           </div>
-          <h1 className="hero-title">
-            <span className="gradient-text">Speak your heart</span> online 💬
-          </h1>
           <p className="hero-subtitle">
             One QR code. All your socials. No cap. 🚀
             <br />

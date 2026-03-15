@@ -61,6 +61,28 @@ function App() {
   const currentUserRef = useRef(null);
   const isPaymentSuccessPopup = usePaymentSuccessPopup();
 
+  // Listen for payment success from Square payment link popup (works when payment opened from Subscription page)
+  useEffect(() => {
+    const handleMessage = (event) => {
+      if (event.origin !== window.location.origin || event.data?.type !== 'SQUARE_PAYMENT_SUCCESS') return;
+      const userId = currentUser?.id;
+      if (!userId) return;
+      (async () => {
+        try {
+          const { recordPaymentFromLinkAndActivate, getSubscriptionStatus, clearSubscriptionStatusCache } = await import('./utils/subscription');
+          await recordPaymentFromLinkAndActivate(userId, { search: event.data.search, href: event.data.href });
+          clearSubscriptionStatusCache(userId);
+          const status = await getSubscriptionStatus(userId, true);
+          setSubscriptionStatus(status);
+        } catch (err) {
+          console.error('Error recording payment from link:', err);
+        }
+      })();
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [currentUser?.id]);
+
   // Apply theme on initial mount
   useEffect(() => {
     const theme = getTheme();
