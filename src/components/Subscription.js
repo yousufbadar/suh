@@ -18,7 +18,6 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess }) 
   const [isCancelling, setIsCancelling] = useState(false);
   const [paymentHistory, setPaymentHistory] = useState([]);
   const [loadingPayments, setLoadingPayments] = useState(false);
-  const [showPaymentLinkModal, setShowPaymentLinkModal] = useState(false);
   const [paymentLinkRecording, setPaymentLinkRecording] = useState(false);
   const cardContainerRef = useRef(null);
   const initializationTimeoutRef = useRef(null);
@@ -42,7 +41,6 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess }) 
           clearSubscriptionStatusCache(currentUser.id);
           const status = await getSubscriptionStatus(currentUser.id, true);
           setSubscriptionStatus(status);
-          setShowPaymentLinkModal(false);
           if (onSubscriptionSuccess) onSubscriptionSuccess();
         } catch (err) {
           console.error('Error recording payment from link:', err);
@@ -703,35 +701,6 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess }) 
         onCancel={handleCancelSubscriptionCancel}
         showCancel={!isCancelling}
       />
-      {showPaymentLinkModal && (
-        <div className="subscription-payment-link-modal-overlay" onClick={() => !paymentLinkRecording && setShowPaymentLinkModal(false)} role="dialog" aria-modal="true" aria-labelledby="payment-link-modal-title">
-          <div className="subscription-payment-link-modal" onClick={e => e.stopPropagation()}>
-            <h2 id="payment-link-modal-title">Complete payment</h2>
-            <p>You&apos;ll complete payment securely in a popup. After payment, the window will close and your subscription will be activated for this account.</p>
-            <p className="subscription-payment-link-modal-note">
-              In your Square dashboard, set the payment link&apos;s success redirect URL to:{' '}
-              <code>{typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname || ''}?payment_success=1` : '...?payment_success=1'}</code>
-            </p>
-            <div className="subscription-payment-link-modal-actions">
-              <button
-                type="button"
-                className="plan-button"
-                style={{ cursor: paymentLinkRecording ? 'wait' : 'pointer' }}
-                disabled={paymentLinkRecording}
-                onClick={() => {
-                  const w = window.open(SQUARE_PAYMENT_LINK_URL, 'squarePayment', 'width=600,height=700,scrollbars=yes');
-                  if (w) w.focus();
-                }}
-              >
-                {paymentLinkRecording ? 'Recording payment...' : 'Continue to payment'}
-              </button>
-              <button type="button" className="back-button-subscription" onClick={() => setShowPaymentLinkModal(false)} disabled={paymentLinkRecording}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       <div className="subscription-header">
         {onBack && (
           <button onClick={onBack} className="back-button-subscription">
@@ -757,7 +726,10 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess }) 
             <div style={{ display: 'flex', justifyContent: 'center', width: '100%', marginTop: '1.25rem' }}>
               <button
                 type="button"
-                onClick={() => setShowPaymentLinkModal(true)}
+                onClick={() => {
+                  const w = window.open(SQUARE_PAYMENT_LINK_URL, 'squarePayment', 'width=600,height=700,scrollbars=yes');
+                  if (w) w.focus();
+                }}
                 className="plan-button"
                 style={{
                   display: 'inline-flex',
