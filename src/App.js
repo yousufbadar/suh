@@ -9,6 +9,7 @@ import SocialMediaIconsPage from './components/SocialMediaIconsPage';
 import ProfileDashboard from './components/ProfileDashboard';
 import ConfirmDialog from './components/ConfirmDialog';
 import Subscription from './components/Subscription';
+import SiteBanner from './components/SiteBanner';
 import { getEntities, deactivateEntity, reactivateEntity, deleteEntity } from './utils/storage';
 import { getTheme, applyTheme } from './utils/theme';
 import { supabase, isClientValid, testConnection } from './lib/supabase';
@@ -705,6 +706,7 @@ function App() {
   if (!currentUser && protectedPages.includes(currentPage)) {
     return (
       <div className="App">
+        <SiteBanner />
         <Login onLoginSuccess={handleLoginSuccess} />
       </div>
     );
@@ -715,6 +717,7 @@ function App() {
   if (showLogin && currentPage !== 'icons' && currentPage !== 'home' && !currentUser && !isLoadingAuth) {
     return (
       <div className="App">
+        <SiteBanner />
         <Login onLoginSuccess={handleLoginSuccess} />
       </div>
     );
@@ -742,6 +745,7 @@ function App() {
         onConfirm={confirmPermanentDelete}
         onCancel={cancelPermanentDelete}
       />
+      <SiteBanner compact />
       <div className="container">
         <nav className="app-nav">
           <button

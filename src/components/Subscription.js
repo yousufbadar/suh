@@ -18,7 +18,6 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess }) 
   const [isCancelling, setIsCancelling] = useState(false);
   const [paymentHistory, setPaymentHistory] = useState([]);
   const [loadingPayments, setLoadingPayments] = useState(false);
-  const [paymentLinkRecording, setPaymentLinkRecording] = useState(false);
   const cardContainerRef = useRef(null);
   const initializationTimeoutRef = useRef(null);
   const initializationCompleteRef = useRef(false);
@@ -33,7 +32,6 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess }) 
     const handleMessage = (event) => {
       if (event.origin !== window.location.origin || event.data?.type !== 'SQUARE_PAYMENT_SUCCESS') return;
       if (!currentUser?.id) return;
-      setPaymentLinkRecording(true);
       (async () => {
         try {
           const { recordPaymentFromLinkAndActivate, getSubscriptionStatus, clearSubscriptionStatusCache } = await import('../utils/subscription');
@@ -45,8 +43,6 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess }) 
         } catch (err) {
           console.error('Error recording payment from link:', err);
           setError(err.message || 'Failed to record payment. Please contact support.');
-        } finally {
-          setPaymentLinkRecording(false);
         }
       })();
     };
@@ -740,10 +736,10 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess }) 
                   padding: '12px 24px',
                   fontSize: '1rem',
                   textDecoration: 'none',
-                  background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                  background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
                   color: '#fff',
                   border: 'none',
-                  boxShadow: '0 4px 14px rgba(5, 150, 105, 0.4)',
+                  boxShadow: '0 4px 14px rgba(185, 28, 28, 0.4)',
                   cursor: 'pointer',
                   borderRadius: '8px',
                 }}

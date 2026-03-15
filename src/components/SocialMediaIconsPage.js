@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import './SocialMediaIconsPage.css';
+import SiteBanner from './SiteBanner';
 import { getEntityByUUID, trackQRScan, trackSocialClick, trackCustomLinkClick } from '../utils/storage';
 import { getTheme, applyTheme } from '../utils/theme';
 import {
@@ -179,23 +180,29 @@ function SocialMediaIconsPage({ uuid }) {
 
   if (loading) {
     return (
-      <div className="social-icons-page">
-        <div className="loading-container">
-          <FaSpinner className="spinner" />
-          <p>Loading...</p>
+      <>
+        <SiteBanner compact />
+        <div className="social-icons-page">
+          <div className="loading-container">
+            <FaSpinner className="spinner" />
+            <p>Loading...</p>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   if (!entity) {
     return (
-      <div className="social-icons-page">
+      <>
+        <SiteBanner compact />
+        <div className="social-icons-page">
             <div className="error-container">
               <h1>Profile Not Found</h1>
               <p>The QR code is invalid or the profile has been removed.</p>
             </div>
-      </div>
+        </div>
+      </>
     );
   }
 
@@ -204,16 +211,21 @@ function SocialMediaIconsPage({ uuid }) {
 
   if (socialMediaLinks.length === 0 && customLinks.length === 0) {
     return (
-      <div className="social-icons-page">
-        <div className="social-icons-container">
-          <p className="no-links-message">No links available for this profile.</p>
+      <>
+        <SiteBanner compact />
+        <div className="social-icons-page">
+          <div className="social-icons-container">
+            <p className="no-links-message">No links available for this profile.</p>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="social-icons-page">
+    <>
+      <SiteBanner compact />
+      <div className="social-icons-page">
       <div className="social-icons-container">
         <div className="company-header">
           {entity.logo && (
@@ -293,6 +305,7 @@ function SocialMediaIconsPage({ uuid }) {
         </a>
       </div>
     </div>
+    </>
   );
 }
 

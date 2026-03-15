@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import './Home.css';
-import { FaHeart, FaQrcode, FaShareAlt, FaUsers, FaRocket, FaSignInAlt, FaList, FaPlus, FaUser, FaChartBar, FaMousePointer, FaSignOutAlt, FaCrown } from 'react-icons/fa';
+import { FaHeart, FaQrcode, FaShareAlt, FaUsers, FaRocket, FaSignInAlt, FaList, FaPlus, FaChartBar, FaMousePointer, FaSignOutAlt, FaCrown } from 'react-icons/fa';
 import { getTheme, applyTheme } from '../utils/theme';
 import { getEntityWithAnalytics } from '../utils/storage';
 function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProfile, onViewDashboard, onLogout, entities, onViewSubscription, subscriptionStatus }) {
@@ -286,7 +286,7 @@ function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProf
                   onClick={onViewSubscription}
                   type="button"
                   className="cta-button"
-                  style={{ backgroundColor: '#ffd700', color: '#2d3748', border: 'none', flexDirection: 'column', gap: '0.25rem' }}
+                  style={{ background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)', color: '#fff', border: 'none', flexDirection: 'column', gap: '0.25rem', boxShadow: '0 4px 14px rgba(185, 28, 28, 0.4)' }}
                 >
                   <span style={{ fontSize: '0.9rem', opacity: 0.95 }}>Trial Ended</span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600 }}>
@@ -299,7 +299,7 @@ function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProf
                   onClick={onViewSubscription} 
                   type="button"
                   className="cta-button"
-                  style={{ backgroundColor: '#ffd700', color: '#2d3748', border: 'none' }}
+                  style={{ background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)', color: '#fff', border: 'none', boxShadow: '0 4px 14px rgba(185, 28, 28, 0.4)' }}
                 >
                   <FaCrown /> Upgrade Plan
                 </button>
