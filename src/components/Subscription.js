@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './Subscription.css';
-import { FaCheck, FaCrown, FaRocket, FaStar, FaArrowLeft, FaLock, FaCreditCard, FaHistory, FaCalendarAlt } from 'react-icons/fa';
+import { FaCrown, FaRocket, FaArrowLeft, FaLock, FaCreditCard, FaHistory, FaCalendarAlt } from 'react-icons/fa';
 import ConfirmDialog from './ConfirmDialog';
+import { useCart } from '../context/CartContext';
+import { PRODUCTS } from '../context/CartContext';
 
-function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess }) {
+function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess, onNavigateToCart }) {
+  const { addToCart } = useCart();
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
   const [trialDaysRemaining, setTrialDaysRemaining] = useState(30);
@@ -11,6 +14,7 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess }) 
   const [squareCard, setSquareCard] = useState(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const [initStatus, setInitStatus] = useState('Initializing...');
+  void (isProcessing, error, isInitializing, initStatus); // set by effects/handlers; display removed with inline payment form
   const [showTrialConfirmDialog, setShowTrialConfirmDialog] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [successDialogTrial, setSuccessDialogTrial] = useState(false);
@@ -24,8 +28,6 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess }) 
   const squarePaymentsRef = useRef(null);
   const validatedLocationIdRef = useRef(null);
   const validatedApplicationIdRef = useRef(null);
-
-  const SQUARE_PAYMENT_LINK_URL = 'https://square.link/u/u7vBITIp';
 
   // Listen for payment success from Square payment link popup (redirect posts message back)
   useEffect(() => {
@@ -381,73 +383,6 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess }) 
     fetchPayments();
   }, [currentUser, subscriptionStatus?.isActive, subscriptionStatus?.trialActive]);
 
-  const handleStartFreeTrial = async () => {
-    if (!currentUser) {
-      setError('Please log in to start your trial');
-      return;
-    }
-    setIsProcessing(true);
-    setError(null);
-    try {
-      const { startTrial, clearSubscriptionStatusCache, getSubscriptionStatus } = await import('../utils/subscription');
-      await startTrial(currentUser.id);
-      clearSubscriptionStatusCache(currentUser.id);
-      const status = await getSubscriptionStatus(currentUser.id, true);
-      setSubscriptionStatus(status);
-      if (status?.trialActive) {
-        const trialStartDate = new Date(status.trialStartDate);
-        const now = new Date();
-        const daysElapsed = Math.floor((now - trialStartDate) / (1000 * 60 * 60 * 24));
-        setTrialDaysRemaining(Math.max(0, 30 - daysElapsed));
-      }
-      setSuccessDialogTrial(true);
-      setShowSuccessDialog(true);
-    } catch (err) {
-      console.error('Error starting trial:', err);
-      setError(err.message || 'Failed to start trial. Please try again.');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleSubscribe = async () => {
-    if (!currentUser) {
-      setError('Please log in to subscribe');
-      return;
-    }
-
-    // If user has no subscription record yet, start free trial (no payment required)
-    if (subscriptionStatus?.hasSubscriptionRecord === false) {
-      await handleStartFreeTrial();
-      return;
-    }
-
-    if (!squareCard) {
-      setError('Payment system not ready. Please wait a moment and try again.');
-      return;
-    }
-
-    setIsProcessing(true);
-    setError(null);
-
-    try {
-      // Check if trial is still active (and they're trying to convert to paid early)
-      if (trialDaysRemaining > 0) {
-        setShowTrialConfirmDialog(true);
-        setIsProcessing(false);
-        return;
-      }
-
-      // Proceed with subscription (payment required)
-      await proceedWithSubscription();
-    } catch (err) {
-      console.error('Subscription error:', err);
-      setError(err.message || 'Failed to process subscription. Please try again.');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
   const handleCancelSubscriptionClick = () => {
     setShowCancelConfirmDialog(true);
   };
@@ -643,20 +578,6 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess }) 
     }
   };
 
-  const plan = {
-    id: 'pro',
-    name: 'Pro',
-    price: '$9.99',
-    period: 'month',
-    originalPrice: '$19.99',
-    features: [
-      'Unlimited profiles',
-      'Advanced analytics',
-      'Custom branding'
-    ],
-    popular: true
-  };
-
   const isSubscribed = subscriptionStatus?.isActive || false;
   const isTrialActive = subscriptionStatus?.trialActive || false;
   const isTrialEnded = subscriptionStatus?.hasSubscriptionRecord && !subscriptionStatus?.trialActive && !subscriptionStatus?.isActive;
@@ -709,7 +630,7 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess }) 
           </h1>
           <p className="subscription-subtitle">
             {isTrialEnded ? (
-              <>Your free trial has ended. Upgrade to Pro to keep access to all features.</>
+              <>Your free trial has ended. Subscribe now to restore access to all Pro features—profiles, dashboard, and more.</>
             ) : isSubscribed ? (
               <>You're subscribed to Pro! 🎉</>
             ) : isTrialActive && trialDaysRemaining > 0 ? (
@@ -719,12 +640,20 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess }) 
             )}
           </p>
           {isTrialEnded && (
-            <div style={{ display: 'flex', justifyContent: 'center', width: '100%', marginTop: '1.25rem' }}>
+            <div className="trial-ended-cta" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', marginTop: '1.5rem', gap: '1rem', padding: '1.5rem', background: 'rgba(0,0,0,0.04)', borderRadius: '12px', maxWidth: '480px', marginLeft: 'auto', marginRight: 'auto' }}>
+              <p style={{ margin: 0, color: 'var(--text-primary, #1a1a1a)', fontSize: '1rem', textAlign: 'center' }}>
+                Subscribe to Pro ($9.99/month) to unlock your profiles, dashboard, and all features.
+              </p>
               <button
                 type="button"
                 onClick={() => {
-                  const w = window.open(SQUARE_PAYMENT_LINK_URL, 'squarePayment', 'width=600,height=700,scrollbars=yes');
-                  if (w) w.focus();
+                  addToCart({
+                    id: PRODUCTS.PRO_SUBSCRIPTION.id,
+                    name: PRODUCTS.PRO_SUBSCRIPTION.name,
+                    priceCents: PRODUCTS.PRO_SUBSCRIPTION_MONTHLY.priceCents,
+                    interval: 'monthly',
+                  });
+                  if (onNavigateToCart) onNavigateToCart();
                 }}
                 className="plan-button"
                 style={{
@@ -732,20 +661,22 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess }) 
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '0.5rem',
-                  width: 'auto',
-                  padding: '12px 24px',
-                  fontSize: '1rem',
-                  textDecoration: 'none',
-                  background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
+                  padding: '14px 28px',
+                  fontSize: '1.05rem',
+                  fontWeight: 600,
+                  background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
                   color: '#fff',
                   border: 'none',
-                  boxShadow: '0 4px 14px rgba(185, 28, 28, 0.4)',
+                  boxShadow: '0 4px 14px rgba(5, 150, 105, 0.4)',
                   cursor: 'pointer',
                   borderRadius: '8px',
                 }}
               >
                 <FaCrown /> Buy subscription
               </button>
+              <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary, #666)', maxWidth: '420px', textAlign: 'center' }}>
+                You’ll go to the cart to checkout. After payment, your subscription is activated and you’ll have access to all features.
+              </p>
             </div>
           )}
         </div>
@@ -862,129 +793,6 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess }) 
             </div>
           </div>
         </div>
-      ) : !isTrialEnded ? (
-      <div className="subscription-plan-container">
-        <div className="subscription-plan-card popular">
-          {plan.popular && (
-            <div className="popular-badge">
-              <FaStar /> Most Popular
-            </div>
-          )}
-          
-          <div className="plan-header">
-            <h3 className="plan-name">{plan.name}</h3>
-            <div className="plan-price">
-              <span className="price-amount">{plan.price}</span>
-              <span className="price-period">/{plan.period}</span>
-            </div>
-            {plan.originalPrice && (
-              <div className="plan-original-price">
-                <span className="original-price">{plan.originalPrice}</span>
-                <span className="discount-badge">50% OFF</span>
-              </div>
-            )}
-          </div>
-
-          <ul className="plan-features">
-            {plan.features.map((feature, index) => (
-              <li key={index}>
-                <FaCheck className="feature-icon" />
-                <span>{feature}</span>
-              </li>
-            ))}
-          </ul>
-
-            <>
-              {/* No payment required for trial: show only "Start free trial" when user has no subscription record */}
-              {subscriptionStatus?.hasSubscriptionRecord === false ? (
-                <div style={{ marginTop: '1rem' }}>
-                  <p style={{ color: 'var(--text-secondary, #666)', fontSize: '0.95rem', marginBottom: '1rem' }}>
-                    Start your <strong>30-day free trial</strong>. No credit card required.
-                  </p>
-                  <button
-                    className="plan-button"
-                    onClick={handleSubscribe}
-                    disabled={isProcessing}
-                  >
-                    {isProcessing ? 'Starting trial...' : 'Start free trial'}
-                  </button>
-                </div>
-              ) : (
-                <>
-                  {error && error.includes('not configured') ? (
-                    <div className="payment-config-error">
-                      <p>⚠️ Square payment system is not configured.</p>
-                      <p>Please set the following environment variables in your <code>.env</code> file:</p>
-                      <code>REACT_APP_SQUARE_APPLICATION_ID=your_square_application_id</code>
-                      <p style={{ marginTop: '15px', fontSize: '0.9rem' }}>See SUBSCRIPTION_SETUP.md for detailed instructions.</p>
-                    </div>
-                  ) : (
-                    <div className="payment-form">
-                      <div className="card-container-label">
-                        <FaLock /> Secure Payment
-                      </div>
-                      <div id="card-container" ref={cardContainerRef} style={{ minHeight: '50px' }}></div>
-                      {!squareCard && (
-                        <div style={{ 
-                          padding: '15px', 
-                          marginTop: '10px',
-                          background: isInitializing ? '#e3f2fd' : '#fff3cd',
-                          border: `1px solid ${isInitializing ? '#90caf9' : '#ffc107'}`,
-                          borderRadius: '8px',
-                          textAlign: 'center', 
-                          color: '#333', 
-                          fontSize: '0.9rem' 
-                        }}>
-                          <div style={{ marginBottom: '8px', fontWeight: '600' }}>
-                            {isInitializing ? '⏳ Initializing Payment Form...' : '⚠️ Payment Form Not Ready'}
-                          </div>
-                          <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '10px' }}>
-                            Status: {initStatus}
-                          </div>
-                          {!isInitializing && (
-                            <button
-                              onClick={() => window.location.reload()}
-                              style={{
-                                padding: '8px 16px',
-                                background: '#667eea',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                fontSize: '0.85rem',
-                                fontWeight: '600'
-                              }}
-                            >
-                              Retry / Refresh
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  <button
-                    className="plan-button"
-                    onClick={handleSubscribe}
-                    disabled={isProcessing || !squareCard || (error && !error.includes('not configured')) || isInitializing}
-                  >
-                    {isProcessing ? (
-                      'Processing...'
-                    ) : isInitializing ? (
-                      'Loading Payment Form...'
-                    ) : !squareCard && !error?.includes('not configured') ? (
-                      'Payment Form Not Ready'
-                    ) : error && error.includes('not configured') ? (
-                      'Configuration Required'
-                    ) : (
-                      `Subscribe - ${plan.price}/${plan.period}`
-                    )}
-                  </button>
-                </>
-              )}
-            </>
-        </div>
-      </div>
       ) : null}
 
       <div className="subscription-footer">

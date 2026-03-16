@@ -10,6 +10,9 @@ import ProfileDashboard from './components/ProfileDashboard';
 import ConfirmDialog from './components/ConfirmDialog';
 import Subscription from './components/Subscription';
 import SiteBanner from './components/SiteBanner';
+import Cart from './components/Cart';
+import Checkout from './components/Checkout';
+import { useCart } from './context/CartContext';
 import { getEntities, deactivateEntity, reactivateEntity, deleteEntity } from './utils/storage';
 import { getTheme, applyTheme } from './utils/theme';
 import { supabase, isClientValid, testConnection } from './lib/supabase';
@@ -37,7 +40,8 @@ function usePaymentSuccessPopup() {
         console.warn('postMessage to opener failed:', e);
       }
       setIsPaymentSuccessPopup(true);
-      const t = setTimeout(() => window.close(), 1500);
+      // Give opener time to receive postMessage and start recording, then try to close (some browsers block close unless window was opened by script)
+      const t = setTimeout(() => window.close(), 800);
       return () => clearTimeout(t);
     }
   }, []);
@@ -61,6 +65,31 @@ function App() {
   const [subscriptionStatus, setSubscriptionStatus] = useState(null);
   const currentUserRef = useRef(null);
   const isPaymentSuccessPopup = usePaymentSuccessPopup();
+  const paymentSuccessHandledRef = useRef(false);
+  const { count: cartCount } = useCart();
+
+  // When Square redirects to our URL in the main window (e.g. same tab), record payment and clear URL
+  useEffect(() => {
+    if (isLoadingAuth || paymentSuccessHandledRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    if (!params.get('payment_success') || window.opener) return; // popup case handled elsewhere
+    const userId = currentUser?.id;
+    if (!userId) return;
+    paymentSuccessHandledRef.current = true;
+    (async () => {
+      try {
+        const { recordPaymentFromLinkAndActivate, getSubscriptionStatus, clearSubscriptionStatusCache } = await import('./utils/subscription');
+        await recordPaymentFromLinkAndActivate(userId, { search: window.location.search, href: window.location.href });
+        clearSubscriptionStatusCache(userId);
+        const status = await getSubscriptionStatus(userId, true);
+        setSubscriptionStatus(status);
+        window.history.replaceState({}, document.title, window.location.pathname + (window.location.hash || ''));
+      } catch (err) {
+        console.error('Error recording payment from redirect:', err);
+        paymentSuccessHandledRef.current = false;
+      }
+    })();
+  }, [currentUser?.id, isLoadingAuth]);
 
   // Listen for payment success from Square payment link popup (works when payment opened from Subscription page)
   useEffect(() => {
@@ -615,13 +644,28 @@ function App() {
     setCurrentPage('list');
   };
 
+  const handleSubscriptionPaid = useCallback(async (userId, paymentData) => {
+    try {
+      const { activateSubscriptionAfterPayment, getSubscriptionStatus, clearSubscriptionStatusCache } = await import('./utils/subscription');
+      await activateSubscriptionAfterPayment(userId, paymentData);
+      clearSubscriptionStatusCache(userId);
+      const status = await getSubscriptionStatus(userId, true);
+      setSubscriptionStatus(status);
+    } catch (err) {
+      console.error('Error activating subscription after payment:', err);
+      throw err;
+    }
+  }, []);
 
   // Payment link success redirect: we're in a popup; show closing message (postMessage already sent in usePaymentSuccessPopup)
   if (isPaymentSuccessPopup) {
     return (
-      <div className="App" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', flexDirection: 'column', gap: '1rem' }}>
+      <div className="App" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', flexDirection: 'column', gap: '1rem', padding: '1rem' }}>
         <div>Payment successful.</div>
         <div style={{ fontSize: '0.9rem', color: '#666' }}>Closing window...</div>
+        <button type="button" onClick={() => window.close()} style={{ marginTop: '1rem', padding: '10px 20px', cursor: 'pointer', fontSize: '1rem' }}>
+          Close this window
+        </button>
       </div>
     );
   }
@@ -706,7 +750,7 @@ function App() {
   if (!currentUser && protectedPages.includes(currentPage)) {
     return (
       <div className="App">
-        <SiteBanner />
+        <SiteBanner onLogoClick={() => setCurrentPage('home')} />
         <Login onLoginSuccess={handleLoginSuccess} />
       </div>
     );
@@ -717,7 +761,7 @@ function App() {
   if (showLogin && currentPage !== 'icons' && currentPage !== 'home' && !currentUser && !isLoadingAuth) {
     return (
       <div className="App">
-        <SiteBanner />
+        <SiteBanner onLogoClick={() => setCurrentPage('home')} />
         <Login onLoginSuccess={handleLoginSuccess} />
       </div>
     );
@@ -745,7 +789,7 @@ function App() {
         onConfirm={confirmPermanentDelete}
         onCancel={cancelPermanentDelete}
       />
-      <SiteBanner compact />
+      <SiteBanner compact onLogoClick={() => setCurrentPage('home')} />
       <div className="container">
         <nav className="app-nav">
           <button
@@ -770,6 +814,14 @@ function App() {
             className={`nav-button ${currentPage === 'register' ? 'active' : ''}`}
           >
             {editingEntity ? 'Edit Profile' : 'Create Profile'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setCurrentPage('cart')}
+            className={`nav-button ${currentPage === 'cart' ? 'active' : ''}`}
+            title="Cart"
+          >
+            Cart {cartCount > 0 && <span className="nav-cart-badge">{cartCount}</span>}
           </button>
           {currentUser && (
             <button
@@ -855,6 +907,7 @@ function App() {
             {currentPage === 'subscription' && (
                 <Subscription
                   onBack={() => setCurrentPage('home')}
+                  onNavigateToCart={() => setCurrentPage('cart')}
                   currentUser={currentUser}
                   onLogout={handleLogout}
                   onSubscriptionSuccess={() => {
@@ -873,6 +926,22 @@ function App() {
                     setCurrentPage('home');
                   }}
                 />
+            )}
+
+            {currentPage === 'cart' && (
+              <Cart
+                onCheckout={() => setCurrentPage('checkout')}
+                onBack={() => setCurrentPage('list')}
+              />
+            )}
+
+            {currentPage === 'checkout' && (
+              <Checkout
+                currentUser={currentUser}
+                onSubscriptionPaid={handleSubscriptionPaid}
+                onSuccess={() => setCurrentPage('home')}
+                onBack={() => setCurrentPage('cart')}
+              />
             )}
       </div>
     </div>

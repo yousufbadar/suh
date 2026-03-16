@@ -86,6 +86,21 @@
   border-color: #ffd700;
 }
 
+.nav-cart-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: #dc2626;
+  color: #fff;
+  border-radius: 999px;
+  margin-left: 0.25rem;
+}
+
 .nav-button.active {
   background: linear-gradient(135deg, #ffd700 0%, #32cd32 100%);
   color: white;

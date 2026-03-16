@@ -419,6 +419,93 @@ export const recordPaymentFromLinkAndActivate = async (userId, redirectParams = 
 };
 
 /**
+ * After successful payment via cart/checkout (Square card). Records the transaction and activates subscription.
+ * paymentResult: { paymentId, amount (cents), currency?, interval?: 'monthly'|'yearly' } from backend + cart.
+ */
+export const activateSubscriptionAfterPayment = async (userId, paymentResult = {}) => {
+  if (!supabase || !supabase.from) {
+    throw new Error('Database not configured');
+  }
+  const now = new Date();
+  const isYearly = paymentResult.interval === 'yearly';
+  const subscriptionEndDate = new Date(now);
+  if (isYearly) {
+    subscriptionEndDate.setFullYear(subscriptionEndDate.getFullYear() + 1);
+  } else {
+    subscriptionEndDate.setMonth(subscriptionEndDate.getMonth() + 1);
+  }
+  const nextBilling = subscriptionEndDate.toISOString();
+  const transactionDate = now.toISOString();
+  const amountCents = Number(paymentResult.amount) || SUBSCRIPTION_PRICE;
+  const paymentId = paymentResult.paymentId || `cart-${Date.now()}`;
+  const billingCycle = isYearly ? 'yearly' : 'monthly';
+
+  const { data: existing } = await supabase
+    .from('subscriptions')
+    .select('id')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  let subscriptionId;
+  if (existing) {
+    subscriptionId = existing.id;
+    const updatePayload = {
+      is_active: true,
+      subscription_end_date: subscriptionEndDate.toISOString(),
+      last_payment_date: transactionDate,
+      next_billing_date: nextBilling,
+      billing_cycle: billingCycle,
+      payment_failed_count: 0,
+      status: 'active',
+    };
+    const { error: updateError } = await supabase
+      .from('subscriptions')
+      .update(updatePayload)
+      .eq('id', subscriptionId);
+    if (updateError) throw updateError;
+  } else {
+    const insertPayload = {
+      user_id: userId,
+      plan_type: 'pro',
+      is_active: true,
+      subscription_end_date: subscriptionEndDate.toISOString(),
+      last_payment_date: transactionDate,
+      next_billing_date: nextBilling,
+      billing_cycle: billingCycle,
+      status: 'active',
+      created_at: transactionDate,
+    };
+    const { data: inserted, error: insertError } = await supabase
+      .from('subscriptions')
+      .insert(insertPayload)
+      .select('id')
+      .single();
+    if (insertError) throw insertError;
+    subscriptionId = inserted.id;
+  }
+
+  await recordPayment(subscriptionId, userId, {
+    paymentId: String(paymentId),
+    amountCents,
+    currency: paymentResult.currency || 'USD',
+    paymentStatus: 'completed',
+    paymentMethod: 'card',
+    transactionDate,
+    billingPeriodStart: transactionDate,
+    billingPeriodEnd: subscriptionEndDate.toISOString(),
+    metadata: { planType: 'pro', source: 'cart_checkout', squarePaymentId: paymentId, billingCycle },
+  });
+
+  clearSubscriptionStatusCache(userId);
+  logSubscriptionEvent(subscriptionId, userId, 'payment_processor', 'subscription_activated', {
+    source: 'cart_checkout',
+    paymentId,
+  }).catch(err => console.error('Error logging subscription event (non-blocking):', err));
+
+  return { success: true, subscriptionId };
+};
+
+/**
  * Cancel subscription
  * Minimal update (is_active + trial_start_date) works with base schema.
  * Optionally sets status/cancelled_at if those columns exist (migration 005).
