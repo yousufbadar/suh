@@ -43,5 +43,8 @@
   },
   "overrides": {
     "es-abstract": "^1.23.3"
+  },
+  "devDependencies": {
+    "vercel": "^50.34.2"
   }
 }

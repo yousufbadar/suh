@@ -7,6 +7,13 @@ const SQUARE_SDK_PRODUCTION = 'https://web.squarecdn.com/v1/square.js';
 
 const PRO_SUBSCRIPTION_ID = 'pro-subscription';
 
+const getBackendUrl = () => {
+  const configured = (process.env.REACT_APP_BACKEND_API_URL || '').trim();
+  if (configured) return configured.replace(/\/$/, '');
+  if (typeof window !== 'undefined' && window.location?.origin) return window.location.origin;
+  return '';
+};
+
 function Checkout({ onSuccess, onBack, currentUser, onSubscriptionPaid }) {
   const { items, totalCents, clearCart } = useCart();
   const [config, setConfig] = useState(null);
@@ -29,9 +36,10 @@ function Checkout({ onSuccess, onBack, currentUser, onSubscriptionPaid }) {
 
   // Fetch backend config (applicationId, locationId, sandbox)
   useEffect(() => {
-    const backendUrl = process.env.REACT_APP_BACKEND_API_URL;
+    const backendUrl = getBackendUrl();
     if (!backendUrl || totalCents < 1) {
       if (totalCents < 1) setError('Cart is empty.');
+      if (!backendUrl) setError('Payment backend URL is not configured.');
       setIsInitializing(false);
       return;
     }
@@ -168,7 +176,7 @@ function Checkout({ onSuccess, onBack, currentUser, onSubscriptionPaid }) {
         return;
       }
 
-      const backendUrl = process.env.REACT_APP_BACKEND_API_URL;
+    const backendUrl = getBackendUrl();
       if (!backendUrl) {
         setError('Payment backend not configured (REACT_APP_BACKEND_API_URL).');
         setIsProcessing(false);

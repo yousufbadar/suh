@@ -3,7 +3,12 @@
  * Fire-and-forget; failures are logged but do not block the UI.
  */
 
-const getBackendUrl = () => (process.env.REACT_APP_BACKEND_API_URL || '').trim();
+const getBackendUrl = () => {
+  const configured = (process.env.REACT_APP_BACKEND_API_URL || '').trim();
+  if (configured) return configured.replace(/\/$/, '');
+  if (typeof window !== 'undefined' && window.location?.origin) return window.location.origin;
+  return '';
+};
 
 export async function sendNotification(to, type, data = {}) {
   const url = getBackendUrl();

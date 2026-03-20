@@ -39,11 +39,11 @@ const { buildNotificationEmail } = require('./email-templates.js');
 
 let resend = null;
 try {
-  const Resend = require('resend');
+  const { Resend } = require('resend');
   const resendKey = env('RESEND_API_KEY');
   if (resendKey) resend = new Resend(resendKey);
 } catch (e) {
-  // resend not installed or init failed
+  console.warn('[Email] Resend init failed:', e?.message || e);
 }
 const emailFrom = env('EMAIL_FROM') || 'Share Your Heart Today <onboarding@resend.dev>';
 
