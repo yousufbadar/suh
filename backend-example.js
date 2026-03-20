@@ -13,8 +13,9 @@
  * 4. node backend-example.js
  *
  * Endpoints:
- *   GET  /api/config         → { applicationId, locationId, sandbox } for Web SDK
- *   POST /api/create-payment → body: { sourceId, amount (cents string), idempotencyKey }
+ *   GET  /api/config           → { applicationId, locationId, sandbox } for Web SDK
+ *   POST /api/create-payment   → body: { sourceId, amount (cents string), idempotencyKey }
+ *   POST /api/send-notification → body: { to, type, data } — customer emails (payment, trial, subscription, weekly summary)
  *   POST /api/process-subscription, POST /api/process-payment (legacy)
  */
 
@@ -22,7 +23,7 @@ const path = require('path');
 const express = require('express');
 const crypto = require('crypto');
 
-// Load .env from project root; then .env.local; then build/.env.local (Create React App puts env in build when deployed)
+// Load .env first so RESEND_API_KEY and others are available
 const projectRoot = __dirname;
 require('dotenv').config({ path: path.join(projectRoot, '.env') });
 require('dotenv').config({ path: path.join(projectRoot, '.env.local') });
@@ -33,6 +34,18 @@ function env(key, defaultValue = null) {
   if (raw == null || raw === '') return defaultValue;
   return String(raw).trim().replace(/\r?\n/g, '');
 }
+
+const { buildNotificationEmail } = require('./email-templates.js');
+
+let resend = null;
+try {
+  const Resend = require('resend');
+  const resendKey = env('RESEND_API_KEY');
+  if (resendKey) resend = new Resend(resendKey);
+} catch (e) {
+  // resend not installed or init failed
+}
+const emailFrom = env('EMAIL_FROM') || 'Share Your Heart Today <onboarding@resend.dev>';
 
 /** Recursively convert BigInt to Number so res.json() can serialize (JSON.stringify doesn't support BigInt). */
 function sanitizeForJson(val) {
@@ -82,6 +95,7 @@ console.log('[Square config] SQUARE_APPLICATION_ID:', applicationId ? `set (${ap
 console.log('[Square config] SQUARE_LOCATION_ID:', locationId || 'MISSING');
 console.log('[Square config] SQUARE_ENVIRONMENT / sandbox:', sandbox ? 'sandbox' : 'production');
 console.log('[Square config] Square client:', squareClient ? 'initialized' : 'NOT initialized');
+console.log('[Email] Resend:', resend ? 'configured' : 'not configured (set RESEND_API_KEY to send emails)');
 
 const app = express();
 app.use(express.json());
@@ -431,8 +445,54 @@ app.post('/api/process-payment', async (req, res) => {
   }
 });
 
+/** POST /api/send-notification — send customer email (payment, trial, subscription, weekly summary). Body: { to, type, data } */
+app.post('/api/send-notification', async (req, res) => {
+  const { to, type, data } = req.body || {};
+  if (!to || typeof to !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+    return res.status(400).json({ success: false, error: 'Valid "to" email is required' });
+  }
+  const allowedTypes = ['payment_receipt', 'subscription_activated', 'trial_started', 'subscription_cancelled', 'trial_ending_reminder', 'weekly_dashboard_summary'];
+  const notificationType = allowedTypes.includes(type) ? type : 'weekly_dashboard_summary';
+  const { subject, html } = buildNotificationEmail(notificationType, data || {});
+
+  if (!resend) {
+    console.log('[send-notification] Resend not configured; would send:', notificationType, 'to', to);
+    return res.json({ success: true, skipped: true, message: 'Email not sent (Resend not configured)' });
+  }
+
+  try {
+    const result = await resend.emails.send({
+      from: emailFrom,
+      to: [to],
+      subject,
+      html,
+    });
+    if (result.error) {
+      console.error('[send-notification] Resend error:', result.error);
+      return res.status(500).json({ success: false, error: result.error.message || 'Failed to send email' });
+    }
+    console.log('[send-notification] sent:', notificationType, 'to', to, 'id=', result.data?.id);
+    return res.json({ success: true, id: result.data?.id });
+  } catch (err) {
+    console.error('[send-notification] Error:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to send email' });
+  }
+});
+
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Ensure unknown routes return JSON (so the frontend never receives an HTML 404 page).
+app.use((req, res) => {
+  res.status(404).json({ success: false, error: 'Not found' });
+});
+
+// Express error handler (keep responses JSON)
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  console.error('Server error:', err);
+  res.status(500).json({ success: false, error: err?.message || 'Server error' });
 });
 
 const PORT = process.env.PORT || 3001;

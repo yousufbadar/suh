@@ -109,7 +109,14 @@ function Login({ onLoginSuccess, onClose }) {
         console.log('📝 Attempting registration with email:', formData.email);
         const user = await registerUser(formData.email, formData.password, formData.username);
         console.log('✅ Registration successful, calling onLoginSuccess');
-        
+        if (user?.email) {
+          try {
+            const { sendTrialStarted } = await import('../utils/notificationEmail');
+            sendTrialStarted(user.email);
+          } catch (e) {
+            console.warn('Trial started email send failed:', e);
+          }
+        }
         // Call onLoginSuccess and wait for it, but don't let errors here prevent loading state reset
         try {
           if (onLoginSuccess) {

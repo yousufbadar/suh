@@ -42,7 +42,10 @@ function Checkout({ onSuccess, onBack, currentUser, onSubscriptionPaid }) {
           const text = await r.text();
           if (text.trim().startsWith('<')) {
             throw new Error(
-              'Payment server returned a page instead of JSON. Is the backend running? Start it with: node backend-example.js'
+              `Backend response was HTML, not JSON. This usually means your production \`REACT_APP_BACKEND_API_URL\` points to the frontend host (SPA), not the Node backend.\n\n` +
+                `Checked URL: ${backendUrl}/api/config\n` +
+                `HTTP status: ${r.status} ${r.statusText}\n\n` +
+                `Make sure the backend is deployed/running and that REACT_APP_BACKEND_API_URL points to it.`
             );
           }
           throw new Error(r.statusText || `Server error ${r.status}`);
@@ -216,6 +219,18 @@ function Checkout({ onSuccess, onBack, currentUser, onSubscriptionPaid }) {
           setSubscriptionActivated(true);
         } catch (err) {
           console.error('Error recording subscription after payment:', err);
+        }
+      }
+
+      if (currentUser?.email) {
+        try {
+          const { sendPaymentReceipt } = await import('../utils/notificationEmail');
+          sendPaymentReceipt(currentUser.email, {
+            amountCents: data.amount != null ? data.amount : totalCents,
+            date: new Date().toISOString(),
+          });
+        } catch (e) {
+          console.warn('Payment receipt email send failed:', e);
         }
       }
 

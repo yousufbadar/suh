@@ -651,11 +651,18 @@ function App() {
       clearSubscriptionStatusCache(userId);
       const status = await getSubscriptionStatus(userId, true);
       setSubscriptionStatus(status);
+      if (currentUser?.email) {
+        const { sendSubscriptionActivated } = await import('./utils/notificationEmail');
+        sendSubscriptionActivated(currentUser.email, {
+          billingCycle: status.billingCycle || 'monthly',
+          nextBillingDate: status.nextBillingDate || null,
+        });
+      }
     } catch (err) {
       console.error('Error activating subscription after payment:', err);
       throw err;
     }
-  }, []);
+  }, [currentUser?.email]);
 
   // Payment link success redirect: we're in a popup; show closing message (postMessage already sent in usePaymentSuccessPopup)
   if (isPaymentSuccessPopup) {

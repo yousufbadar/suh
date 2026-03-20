@@ -139,7 +139,7 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess, on
       // Load Square Web Payments SDK
       setInitStatus('📥 Loading Square SDK from CDN...');
       const script = document.createElement('script');
-      script.src = 'https://sandbox.web.squarecdn.com/v1/square.js';
+      script.src = 'https://web.squarecdn.com/v1/square.js';
       script.type = 'text/javascript';
       script.async = true;
       script.onload = () => {
@@ -389,12 +389,21 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess, on
 
   const handleCancelSubscriptionConfirm = async () => {
     if (!currentUser) return;
+    const accessUntil = subscriptionStatus?.nextBillingDate || subscriptionStatus?.subscriptionEndDate || null;
     setIsCancelling(true);
     setError(null);
     try {
       const { cancelSubscription, clearSubscriptionStatusCache } = await import('../utils/subscription');
       await cancelSubscription(currentUser.id);
       clearSubscriptionStatusCache(currentUser.id);
+      if (currentUser.email) {
+        try {
+          const { sendSubscriptionCancelled } = await import('../utils/notificationEmail');
+          sendSubscriptionCancelled(currentUser.email, { accessUntil });
+        } catch (e) {
+          console.warn('Subscription cancelled email send failed:', e);
+        }
+      }
       setSubscriptionStatus({
         isActive: false,
         trialActive: false,
