@@ -28,11 +28,26 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess, on
   const squarePaymentsRef = useRef(null);
   const validatedLocationIdRef = useRef(null);
   const validatedApplicationIdRef = useRef(null);
+  const hasSquareSuccessParams = (search) => {
+    const params = new URLSearchParams(search || '');
+    return Boolean(
+      params.get('payment_success') ||
+      params.get('checkout_id') ||
+      params.get('checkoutId') ||
+      params.get('order_id') ||
+      params.get('orderId') ||
+      params.get('payment_id') ||
+      params.get('paymentId') ||
+      params.get('transaction_id') ||
+      params.get('transactionId')
+    );
+  };
 
   // Listen for payment success from Square payment link popup (redirect posts message back)
   useEffect(() => {
     const handleMessage = (event) => {
-      if (event.origin !== window.location.origin || event.data?.type !== 'SQUARE_PAYMENT_SUCCESS') return;
+      if (event.data?.type !== 'SQUARE_PAYMENT_SUCCESS') return;
+      if (!hasSquareSuccessParams(event.data?.search)) return;
       if (!currentUser?.id) return;
       (async () => {
         try {
@@ -115,6 +130,10 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess, on
     const loadSquareSDK = () => {
       setInitStatus('Loading Square SDK script...');
       setError(null);
+      const isSandbox = /^sandbox-/i.test(applicationId);
+      const sdkUrl = isSandbox
+        ? 'https://sandbox.web.squarecdn.com/v1/square.js'
+        : 'https://web.squarecdn.com/v1/square.js';
 
       // Check if script is already loaded
       if (window.Square && window.Square.payments) {
@@ -125,7 +144,7 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess, on
       }
 
       // Check if script is already being loaded
-      const existingScript = document.querySelector('script[src*="square"]');
+      const existingScript = document.querySelector(`script[src="${sdkUrl}"]`);
       if (existingScript) {
         console.log('⏳ Square SDK script already in DOM, waiting for load...');
         setInitStatus('⏳ SDK script already loading...');
@@ -136,10 +155,15 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess, on
         return;
       }
 
+      // If a mismatched Square SDK script exists, remove it before loading the expected one.
+      document.querySelectorAll('script[src*="squarecdn.com/v1/square.js"]').forEach((scriptEl) => {
+        scriptEl.remove();
+      });
+
       // Load Square Web Payments SDK
       setInitStatus('📥 Loading Square SDK from CDN...');
       const script = document.createElement('script');
-      script.src = 'https://web.squarecdn.com/v1/square.js';
+      script.src = sdkUrl;
       script.type = 'text/javascript';
       script.async = true;
       script.onload = () => {
@@ -649,8 +673,8 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess, on
             )}
           </p>
           {isTrialEnded && (
-            <div className="trial-ended-cta" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', marginTop: '1.5rem', gap: '1rem', padding: '1.5rem', background: 'rgba(0,0,0,0.04)', borderRadius: '12px', maxWidth: '480px', marginLeft: 'auto', marginRight: 'auto' }}>
-              <p style={{ margin: 0, color: 'var(--text-primary, #1a1a1a)', fontSize: '1rem', textAlign: 'center' }}>
+            <div className="trial-ended-cta" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', marginTop: '1.5rem', gap: '1rem', padding: '1.5rem', background: 'rgba(255, 255, 255, 0.12)', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.22)', maxWidth: '480px', marginLeft: 'auto', marginRight: 'auto' }}>
+              <p style={{ margin: 0, color: '#ffffff', fontSize: '1rem', textAlign: 'center', fontWeight: 600 }}>
                 Subscribe to Pro ($9.99/month) to unlock your profiles, dashboard, and all features.
               </p>
               <button
@@ -683,7 +707,7 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess, on
               >
                 <FaCrown /> Buy subscription
               </button>
-              <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary, #666)', maxWidth: '420px', textAlign: 'center' }}>
+              <p style={{ margin: 0, fontSize: '0.86rem', color: 'rgba(255, 255, 255, 0.94)', maxWidth: '420px', textAlign: 'center', lineHeight: 1.5 }}>
                 You’ll go to the cart to checkout. After payment, your subscription is activated and you’ll have access to all features.
               </p>
             </div>
@@ -706,9 +730,15 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess, on
 
               <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'rgba(0,0,0,0.04)', borderRadius: '8px', fontSize: '0.9rem' }}>
                 <div style={{ display: 'grid', gap: '0.75rem' }}>
-                  {subscriptionStatus?.planType && (
+                  {(isSubscribed || isTrialActive) && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <FaCrown style={{ opacity: 0.8 }} /> <strong>Plan:</strong> {String(subscriptionStatus.planType).charAt(0).toUpperCase() + String(subscriptionStatus.planType).slice(1)}
+                      {isSubscribed ? <FaCrown style={{ opacity: 0.8 }} /> : <FaRocket style={{ opacity: 0.8 }} />}
+                      <strong>Plan:</strong>{' '}
+                      {isSubscribed
+                        ? (subscriptionStatus?.planType
+                            ? String(subscriptionStatus.planType).charAt(0).toUpperCase() + String(subscriptionStatus.planType).slice(1)
+                            : 'Pro')
+                        : 'Free trial'}
                     </div>
                   )}
                   {(subscriptionStatus?.subscriptionEndDate || subscriptionStatus?.nextBillingDate) && (

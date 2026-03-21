@@ -21,12 +21,27 @@ import './utils/oauth-diagnostics'; // Load diagnostics helper
 
 const TRIAL_RESTRICTED_PAGES = ['list', 'view', 'dashboard', 'register'];
 
+const hasSquareSuccessParams = (search) => {
+  const params = new URLSearchParams(search || '');
+  return Boolean(
+    params.get('payment_success') ||
+    params.get('checkout_id') ||
+    params.get('checkoutId') ||
+    params.get('order_id') ||
+    params.get('orderId') ||
+    params.get('payment_id') ||
+    params.get('paymentId') ||
+    params.get('transaction_id') ||
+    params.get('transactionId')
+  );
+};
+
 // When Square payment link redirects here after success, we're in a popup: notify opener and close
 function usePaymentSuccessPopup() {
   const [isPaymentSuccessPopup, setIsPaymentSuccessPopup] = useState(false);
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (window.opener && params.get('payment_success')) {
+    const paymentRedirectDetected = hasSquareSuccessParams(window.location.search);
+    if (window.opener && paymentRedirectDetected) {
       try {
         window.opener.postMessage(
           {
@@ -34,7 +49,7 @@ function usePaymentSuccessPopup() {
             search: window.location.search,
             href: window.location.href,
           },
-          window.location.origin
+          '*'
         );
       } catch (e) {
         console.warn('postMessage to opener failed:', e);
@@ -71,8 +86,7 @@ function App() {
   // When Square redirects to our URL in the main window (e.g. same tab), record payment and clear URL
   useEffect(() => {
     if (isLoadingAuth || paymentSuccessHandledRef.current) return;
-    const params = new URLSearchParams(window.location.search);
-    if (!params.get('payment_success') || window.opener) return; // popup case handled elsewhere
+    if (!hasSquareSuccessParams(window.location.search) || window.opener) return; // popup case handled elsewhere
     const userId = currentUser?.id;
     if (!userId) return;
     paymentSuccessHandledRef.current = true;
@@ -94,7 +108,8 @@ function App() {
   // Listen for payment success from Square payment link popup (works when payment opened from Subscription page)
   useEffect(() => {
     const handleMessage = (event) => {
-      if (event.origin !== window.location.origin || event.data?.type !== 'SQUARE_PAYMENT_SUCCESS') return;
+      if (event.data?.type !== 'SQUARE_PAYMENT_SUCCESS') return;
+      if (!hasSquareSuccessParams(event.data?.search)) return;
       const userId = currentUser?.id;
       if (!userId) return;
       (async () => {
