@@ -240,6 +240,45 @@ export const getUserById = async (userId) => {
   return user;
 };
 
+// Request a password reset email
+export const requestPasswordReset = async (email) => {
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error('Please enter a valid email address');
+  }
+
+  if (!supabase || !supabase.auth) {
+    throw new Error('Database connection error. Please check your configuration and restart the server.');
+  }
+
+  const redirectTo = `${window.location.origin}${window.location.pathname}`;
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+
+  if (error) {
+    if (error.message?.includes('Too many requests')) {
+      throw new Error('Too many reset requests. Please wait a moment and try again.');
+    }
+    throw new Error(error.message || 'Failed to send reset email');
+  }
+};
+
+// Set a new password (after user clicks the reset link in their email)
+export const updatePassword = async (newPassword) => {
+  if (!newPassword || newPassword.length < 6) {
+    throw new Error('Password must be at least 6 characters');
+  }
+
+  if (!supabase || !supabase.auth) {
+    throw new Error('Database connection error. Please check your configuration and restart the server.');
+  }
+
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+
+  if (error) {
+    throw new Error(error.message || 'Failed to update password');
+  }
+};
+
 // SSO Login with OAuth providers
 export const ssoLogin = async (provider) => {
   // Validate provider

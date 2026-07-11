@@ -26,6 +26,20 @@ The app sends customer emails for:
 
 The frontend calls `POST /api/send-notification` with `{ to, type, data }`. If `RESEND_API_KEY` is not set, the backend still returns success and logs that the email was skipped (so the app does not break).
 
+## Supabase auth emails (password reset, confirmation)
+
+Notification emails above use Resend via your backend. **Password reset and other login emails** are sent by Supabase Auth and default to `Supabase Auth <noreply@mail.app.supabase.io>` until you configure custom SMTP.
+
+To show **Share Your Heart Today** as the sender, enable custom SMTP in Supabase using the same Resend credentials:
+
+1. Supabase Dashboard → **Project Settings → Authentication → SMTP Settings**
+2. Enable **Custom SMTP**
+3. Set **Sender name** to `Share Your Heart Today`
+4. Set **Sender email** to the same address as `EMAIL_FROM`
+5. Host `smtp.resend.com`, port `465` or `587`, username `resend`, password = your `RESEND_API_KEY`
+
+See `SSO_SETUP.md` → **Password Reset** for full steps and email template customization.
+
 ## Frontend
 
 - `REACT_APP_BACKEND_API_URL` must point to your backend (e.g. `http://localhost:3001`) so notification requests can be sent.

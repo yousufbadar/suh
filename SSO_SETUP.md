@@ -171,6 +171,42 @@ When deploying to production:
 
 ---
 
+## Password Reset
+
+Forgot-password emails are sent by **Supabase Auth**, not the app’s Resend notification pipeline. By default they show **Supabase Auth** as the sender.
+
+### Brand the “From” name (Share Your Heart Today)
+
+1. Go to **Project Settings → Authentication → SMTP Settings** (or **Authentication → Emails → SMTP**)
+2. Enable **Custom SMTP**
+3. Use your existing **Resend** account (same one as `EMAIL_SETUP.md`):
+
+   | Field | Value |
+   |-------|-------|
+   | **Sender name** | `Share Your Heart Today` |
+   | **Sender email** | Same as `EMAIL_FROM` (e.g. `notifications@yourdomain.com` or `onboarding@resend.dev` for testing) |
+   | **Host** | `smtp.resend.com` |
+   | **Port** | `465` (SSL) or `587` (TLS) |
+   | **Username** | `resend` |
+   | **Password** | Your `RESEND_API_KEY` |
+
+4. Click **Save**
+
+After saving, password reset (and other auth) emails will show **Share Your Heart Today** instead of Supabase Auth.
+
+### Optional: customize the email body
+
+Under **Authentication → Email Templates → Reset Password**, you can edit the subject and HTML to match your branding.
+
+### Redirect URLs for reset links
+
+Add your app URLs under **Authentication → URL Configuration → Redirect URLs**:
+
+- Local: `http://localhost:3000`
+- Production: `https://yourdomain.com`
+
+---
+
 ## Need Help?
 
 - **Supabase OAuth Docs**: https://supabase.com/docs/guides/auth/social-login

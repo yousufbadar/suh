@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import './Login.css';
 import { loginUser, registerUser } from '../utils/auth';
+import ForgotPassword from './ForgotPassword';
 import { FaGoogle, FaLock, FaUser, FaEnvelope } from 'react-icons/fa';
 
-function Login({ onLoginSuccess, onClose }) {
+function Login({ onLoginSuccess, onCancel }) {
   const [isLogin, setIsLogin] = useState(true);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -79,11 +81,6 @@ function Login({ onLoginSuccess, onClose }) {
           console.error('❌ Error in onLoginSuccess callback:', callbackError);
           // Don't throw - navigation errors shouldn't prevent login completion
         }
-        
-        // Close modal if callback provided
-        if (onClose) {
-          onClose();
-        }
       } else {
         // Register
         const newErrors = {};
@@ -125,11 +122,6 @@ function Login({ onLoginSuccess, onClose }) {
         } catch (callbackError) {
           console.error('❌ Error in onLoginSuccess callback:', callbackError);
           // Don't throw - navigation errors shouldn't prevent registration completion
-        }
-        
-        // Close modal if callback provided
-        if (onClose) {
-          onClose();
         }
       }
     } catch (error) {
@@ -177,10 +169,21 @@ function Login({ onLoginSuccess, onClose }) {
     }
   };
 
+  if (showForgotPassword) {
+    return (
+      <ForgotPassword
+        onBack={() => setShowForgotPassword(false)}
+        onClose={onCancel}
+      />
+    );
+  }
+
   return (
     <div className="login-overlay">
       <div className="login-modal">
-        <button className="close-button" onClick={onClose}>×</button>
+        {onCancel && (
+          <button type="button" className="close-button" onClick={onCancel}>×</button>
+        )}
         
         <div className="login-header">
           <h2>{isLogin ? 'Welcome Back! 🔥' : 'Create Account ✨'}</h2>
@@ -271,6 +274,22 @@ function Login({ onLoginSuccess, onClose }) {
             {errors.password && <span className="error-message">{errors.password}</span>}
           </div>
 
+          {isLogin && (
+            <div className="forgot-password-row">
+              <button
+                type="button"
+                className="forgot-password-link"
+                onClick={() => {
+                  setShowForgotPassword(true);
+                  setErrors({});
+                  setGeneralError('');
+                }}
+              >
+                Forgot password?
+              </button>
+            </div>
+          )}
+
           {!isLogin && (
             <div className="form-group">
               <label htmlFor="confirmPassword">
@@ -322,6 +341,7 @@ function Login({ onLoginSuccess, onClose }) {
             className="toggle-mode"
             onClick={() => {
               setIsLogin(!isLogin);
+              setShowForgotPassword(false);
               setErrors({});
               setGeneralError('');
               setFormData({
@@ -336,6 +356,17 @@ function Login({ onLoginSuccess, onClose }) {
               ? "Don't have an account? Sign Up"
               : 'Already have an account? Sign In'}
           </button>
+
+          {onCancel && (
+            <button
+              type="button"
+              className="cancel-button"
+              onClick={onCancel}
+              disabled={isLoading}
+            >
+              Cancel
+            </button>
+          )}
         </div>
       </div>
     </div>

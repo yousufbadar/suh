@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import './App.css';
 import Home from './components/Home';
 import Login from './components/Login';
+import ResetPassword from './components/ResetPassword';
 import RegistrationForm from './components/RegistrationForm';
 import EntityList from './components/EntityList';
 import EntityView from './components/EntityView';
@@ -77,6 +78,7 @@ function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [showLogin, setShowLogin] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
   const [subscriptionStatus, setSubscriptionStatus] = useState(null);
   const currentUserRef = useRef(null);
   const isPaymentSuccessPopup = usePaymentSuccessPopup();
@@ -208,7 +210,11 @@ function App() {
 
         // Check if this is an OAuth callback (URL contains hash with access_token or error)
         const hash = window.location.hash;
-        if (hash && (hash.includes('access_token') || hash.includes('error') || hash.includes('code'))) {
+        if (hash && hash.includes('type=recovery')) {
+          console.log('🔐 Detected password recovery in URL hash');
+          setShowResetPassword(true);
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } else if (hash && (hash.includes('access_token') || hash.includes('error') || hash.includes('code'))) {
           console.log('🔐 Detected OAuth callback in URL hash');
           // Supabase will automatically process this via detectSessionInUrl
           // But we should wait a moment for it to process
@@ -227,6 +233,16 @@ function App() {
               try {
                 console.log('🔐 Auth state changed:', event, session ? 'Session exists' : 'No session');
                 clearTimeout(safetyTimeout); // Clear safety timeout once auth state is determined
+
+                if (event === 'PASSWORD_RECOVERY') {
+                  console.log('🔐 Password recovery session detected');
+                  setShowResetPassword(true);
+                  setShowLogin(false);
+                  if (isMounted) {
+                    setIsLoadingAuth(false);
+                  }
+                  return;
+                }
                 
                 if (session) {
                   console.log('✅ Session found, getting user...');
@@ -704,6 +720,30 @@ function App() {
     );
   }
 
+  const handleResetPasswordSuccess = async () => {
+    setShowResetPassword(false);
+    const user = await getCurrentUser(true);
+    if (user) {
+      setCurrentUser(user);
+      setCurrentPage('list');
+    } else {
+      setShowLogin(true);
+      setCurrentPage('list');
+    }
+  };
+
+  if (showResetPassword) {
+    return (
+      <div className="App">
+        <SiteBanner onLogoClick={() => {
+          setShowResetPassword(false);
+          setCurrentPage('home');
+        }} />
+        <ResetPassword onSuccess={handleResetPasswordSuccess} />
+      </div>
+    );
+  }
+
   // Render social media icons page separately (full screen without container) - public access
   if (currentPage === 'icons') {
     return <SocialMediaIconsPage uuid={uuid} />;
@@ -767,13 +807,18 @@ function App() {
     );
   }
 
+  const handleLoginCancel = () => {
+    setShowLogin(false);
+    setCurrentPage('home');
+  };
+
   // Show login screen if not authenticated (for protected pages like list, register, view, dashboard, subscription)
   const protectedPages = ['list', 'register', 'view', 'dashboard', 'subscription'];
   if (!currentUser && protectedPages.includes(currentPage)) {
     return (
       <div className="App">
         <SiteBanner onLogoClick={() => setCurrentPage('home')} />
-        <Login onLoginSuccess={handleLoginSuccess} />
+        <Login onLoginSuccess={handleLoginSuccess} onCancel={handleLoginCancel} />
       </div>
     );
   }
@@ -784,7 +829,7 @@ function App() {
     return (
       <div className="App">
         <SiteBanner onLogoClick={() => setCurrentPage('home')} />
-        <Login onLoginSuccess={handleLoginSuccess} />
+        <Login onLoginSuccess={handleLoginSuccess} onCancel={handleLoginCancel} />
       </div>
     );
   }
