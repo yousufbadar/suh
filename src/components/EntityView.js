@@ -3,6 +3,7 @@ import './EntityView.css';
 import { QRCodeSVG } from 'qrcode.react';
 import LocationMap from './LocationMap';
 import { getEntityWithAnalytics, trackSocialClick, trackCustomLinkClick } from '../utils/storage';
+import { sortSocialPlatformKeys } from '../utils/socialPlatforms';
 import {
   FaFacebook,
   FaInstagram,
@@ -37,6 +38,7 @@ import {
   FaSignOutAlt,
 } from 'react-icons/fa';
 import { FaXTwitter } from 'react-icons/fa6';
+import { SiGooglemaps } from 'react-icons/si';
 
 const socialMediaPlatforms = {
   facebook: { name: 'Facebook', icon: FaFacebook, color: '#1877f2' },
@@ -57,6 +59,7 @@ const socialMediaPlatforms = {
   twitch: { name: 'Twitch', icon: FaTwitch, color: '#9146ff' },
   vimeo: { name: 'Vimeo', icon: FaVimeo, color: '#1ab7ea' },
   flickr: { name: 'Flickr', icon: FaFlickr, color: '#ff0084' },
+  'google maps reviews': { name: 'Google Maps Reviews', icon: SiGooglemaps, color: '#4285F4' },
 };
 
 function EntityView({ entity, onBack, onEdit, onDelete, onPermanentDelete, onViewDashboard, onLogout, currentUser }) {
@@ -194,7 +197,7 @@ function EntityView({ entity, onBack, onEdit, onDelete, onPermanentDelete, onVie
     );
   }
 
-  const socialMediaLinks = Object.keys(currentEntity.socialMedia || {});
+  const socialMediaLinks = sortSocialPlatformKeys(Object.keys(currentEntity.socialMedia || {}));
 
   return (
     <div className="entity-view">

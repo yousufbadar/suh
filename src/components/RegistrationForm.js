@@ -35,25 +35,29 @@ import {
   FaTimes,
   FaUserPlus,
   FaExternalLinkAlt,
+  FaPlus,
+  FaTrash,
 } from 'react-icons/fa';
+import { SiGooglemaps } from 'react-icons/si';
 
 const socialMediaPlatforms = [
-  { name: 'Facebook', icon: FaFacebook, color: '#1877f2', defaultDomain: 'https://facebook.com/', placeholder: 'https://facebook.com/yourpage', signupUrl: 'https://www.facebook.com/r.php' },
   { name: 'Twitter', icon: FaTwitter, color: '#1da1f2', defaultDomain: 'https://twitter.com/', placeholder: 'https://twitter.com/yourhandle', signupUrl: 'https://twitter.com/i/flow/signup' },
   { name: 'Instagram', icon: FaInstagram, color: '#e4405f', defaultDomain: 'https://instagram.com/', placeholder: 'https://instagram.com/yourprofile', signupUrl: 'https://www.instagram.com/accounts/emailsignup/' },
-  { name: 'LinkedIn', icon: FaLinkedin, color: '#0077b5', defaultDomain: 'https://linkedin.com/', placeholder: 'https://linkedin.com/company/yourcompany', signupUrl: 'https://www.linkedin.com/signup' },
+  { name: 'Google Maps Reviews', icon: SiGooglemaps, color: '#4285F4', defaultDomain: 'https://www.google.com/maps/', placeholder: 'https://g.page/r/your-business/review', signupUrl: 'https://business.google.com/' },
+  { name: 'Facebook', icon: FaFacebook, color: '#1877f2', defaultDomain: 'https://facebook.com/', placeholder: 'https://facebook.com/yourpage', signupUrl: 'https://www.facebook.com/r.php' },
   { name: 'YouTube', icon: FaYoutube, color: '#ff0000', defaultDomain: 'https://youtube.com/', placeholder: 'https://youtube.com/yourchannel', signupUrl: 'https://accounts.google.com/signup/v2/webcreateaccount?flowName=GlifWebSignIn&flowEntry=SignUp' },
-  { name: 'Pinterest', icon: FaPinterest, color: '#bd081c', defaultDomain: 'https://pinterest.com/', placeholder: 'https://pinterest.com/yourprofile', signupUrl: 'https://www.pinterest.com/join/' },
-  { name: 'Snapchat', icon: FaSnapchat, color: '#fffc00', defaultDomain: 'https://snapchat.com/add/', placeholder: 'https://snapchat.com/add/yourusername', signupUrl: 'https://accounts.snapchat.com/accounts/signup' },
   { name: 'TikTok', icon: FaTiktok, color: '#000000', defaultDomain: 'https://tiktok.com/@', placeholder: 'https://tiktok.com/@yourhandle', signupUrl: 'https://www.tiktok.com/signup' },
+  { name: 'Snapchat', icon: FaSnapchat, color: '#fffc00', defaultDomain: 'https://snapchat.com/add/', placeholder: 'https://snapchat.com/add/yourusername', signupUrl: 'https://accounts.snapchat.com/accounts/signup' },
+  { name: 'WhatsApp', icon: FaWhatsapp, color: '#25d366', defaultDomain: 'https://wa.me/', placeholder: 'https://wa.me/yournumber', signupUrl: 'https://www.whatsapp.com/download' },
+  { name: 'LinkedIn', icon: FaLinkedin, color: '#0077b5', defaultDomain: 'https://linkedin.com/', placeholder: 'https://linkedin.com/company/yourcompany', signupUrl: 'https://www.linkedin.com/signup' },
+  { name: 'Pinterest', icon: FaPinterest, color: '#bd081c', defaultDomain: 'https://pinterest.com/', placeholder: 'https://pinterest.com/yourprofile', signupUrl: 'https://www.pinterest.com/join/' },
+  { name: 'Telegram', icon: FaTelegram, color: '#0088cc', defaultDomain: 'https://t.me/', placeholder: 'https://t.me/yourchannel', signupUrl: 'https://telegram.org/' },
   { name: 'Reddit', icon: FaReddit, color: '#ff4500', defaultDomain: 'https://reddit.com/user/', placeholder: 'https://reddit.com/user/yourusername', signupUrl: 'https://www.reddit.com/register' },
+  { name: 'Discord', icon: FaDiscord, color: '#5865f2', defaultDomain: 'https://discord.gg/', placeholder: 'https://discord.gg/yourserver', signupUrl: 'https://discord.com/register' },
+  { name: 'Twitch', icon: FaTwitch, color: '#9146ff', defaultDomain: 'https://twitch.tv/', placeholder: 'https://twitch.tv/yourchannel', signupUrl: 'https://www.twitch.tv/signup' },
   { name: 'GitHub', icon: FaGithub, color: '#181717', defaultDomain: 'https://github.com/', placeholder: 'https://github.com/yourusername', signupUrl: 'https://github.com/signup' },
   { name: 'Dribbble', icon: FaDribbble, color: '#ea4c89', defaultDomain: 'https://dribbble.com/', placeholder: 'https://dribbble.com/yourprofile', signupUrl: 'https://dribbble.com/signup/new' },
   { name: 'Behance', icon: FaBehance, color: '#1769ff', defaultDomain: 'https://behance.net/', placeholder: 'https://behance.net/yourprofile', signupUrl: 'https://www.behance.net/signup' },
-  { name: 'Telegram', icon: FaTelegram, color: '#0088cc', defaultDomain: 'https://t.me/', placeholder: 'https://t.me/yourchannel', signupUrl: 'https://telegram.org/' },
-  { name: 'WhatsApp', icon: FaWhatsapp, color: '#25d366', defaultDomain: 'https://wa.me/', placeholder: 'https://wa.me/yournumber', signupUrl: 'https://www.whatsapp.com/download' },
-  { name: 'Discord', icon: FaDiscord, color: '#5865f2', defaultDomain: 'https://discord.gg/', placeholder: 'https://discord.gg/yourserver', signupUrl: 'https://discord.com/register' },
-  { name: 'Twitch', icon: FaTwitch, color: '#9146ff', defaultDomain: 'https://twitch.tv/', placeholder: 'https://twitch.tv/yourchannel', signupUrl: 'https://www.twitch.tv/signup' },
   { name: 'Vimeo', icon: FaVimeo, color: '#1ab7ea', defaultDomain: 'https://vimeo.com/', placeholder: 'https://vimeo.com/yourprofile', signupUrl: 'https://vimeo.com/join' },
   { name: 'Flickr', icon: FaFlickr, color: '#ff0084', defaultDomain: 'https://flickr.com/photos/', placeholder: 'https://flickr.com/photos/yourprofile', signupUrl: 'https://www.flickr.com/signup' },
 ];
@@ -65,6 +69,32 @@ const getInitialSocialMedia = () => {
     initialSocial[platform.name.toLowerCase()] = platform.defaultDomain;
   });
   return initialSocial;
+};
+
+const createEmptyCustomLink = () => ({
+  clientId: typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `link-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  name: '',
+  icon: null,
+  link: '',
+  showTextOnPage: false,
+});
+
+/** One blank row for new profiles; existing saved links when editing. */
+const normalizeCustomLinks = (links) => {
+  if (!Array.isArray(links) || links.length === 0) {
+    return [createEmptyCustomLink()];
+  }
+  return links.map((link) => ({
+    clientId: link.clientId || (typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `link-${Date.now()}-${Math.random().toString(36).slice(2)}`),
+    name: link.name || '',
+    icon: link.icon ?? null,
+    link: link.link || '',
+    showTextOnPage: Boolean(link.showTextOnPage),
+  }));
 };
 
 function RegistrationForm({ entity, onSave, onCancel, currentUser, onLogout }) {
@@ -87,11 +117,7 @@ function RegistrationForm({ entity, onSave, onCancel, currentUser, onLogout }) {
           contactPersonPhone: entity.contactPersonPhone || '',
           socialMedia: socialMedia,
           logo: entity.logo || null,
-          customLinks: entity.customLinks || [
-            { name: '', icon: null, link: '' },
-            { name: '', icon: null, link: '' },
-            { name: '', icon: null, link: '' },
-          ],
+          customLinks: normalizeCustomLinks(entity.customLinks),
         };
     }
     return {
@@ -108,11 +134,7 @@ function RegistrationForm({ entity, onSave, onCancel, currentUser, onLogout }) {
       contactPersonPhone: '',
       socialMedia: getInitialSocialMedia(),
       logo: null,
-      customLinks: [
-        { name: '', icon: null, link: '' },
-        { name: '', icon: null, link: '' },
-        { name: '', icon: null, link: '' },
-      ],
+      customLinks: normalizeCustomLinks([]),
     };
   }, [entity]);
 
@@ -218,6 +240,30 @@ function RegistrationForm({ entity, onSave, onCancel, currentUser, onLogout }) {
 
   const handleRemoveCustomLinkIcon = (index) => {
     handleCustomLinkChange(index, 'icon', null);
+  };
+
+  const handleAddCustomLink = () => {
+    setFormData((prev) => ({
+      ...prev,
+      customLinks: [...prev.customLinks, createEmptyCustomLink()],
+    }));
+  };
+
+  const handleRemoveCustomLink = (index) => {
+    setFormData((prev) => {
+      const updatedLinks = prev.customLinks.filter((_, i) => i !== index);
+      return {
+        ...prev,
+        customLinks: updatedLinks.length > 0 ? updatedLinks : [createEmptyCustomLink()],
+      };
+    });
+    setErrors((prev) => {
+      const newErrors = { ...prev };
+      Object.keys(newErrors).forEach((key) => {
+        if (key.startsWith('customLink_')) delete newErrors[key];
+      });
+      return newErrors;
+    });
   };
 
   const handleInputChange = (e) => {
@@ -559,9 +605,12 @@ function RegistrationForm({ entity, onSave, onCancel, currentUser, onLogout }) {
       });
 
       // Filter out empty custom links
-      const customLinksToSave = (sanitizedFormData.customLinks || []).filter(
-        (link) => link.name && link.name.trim() && link.icon && link.link && link.link.trim()
-      );
+      const customLinksToSave = (sanitizedFormData.customLinks || [])
+        .filter((link) => link.name && link.name.trim() && link.icon && link.link && link.link.trim())
+        .map(({ clientId, ...link }) => ({
+          ...link,
+          showTextOnPage: Boolean(link.showTextOnPage),
+        }));
 
       const dataToSave = {
         ...sanitizedFormData,
@@ -881,12 +930,24 @@ function RegistrationForm({ entity, onSave, onCancel, currentUser, onLogout }) {
       <div className="form-section">
         <h2 className="section-title">Custom Links (Optional)</h2>
         <p className="section-description">
-          Add up to 3 optional custom links with your own name, icon image, and URL. Leave empty if not needed.
+          Add custom links with your own name, icon image, and URL. Start with one link and add as many as you need.
         </p>
         <div className="custom-links-container">
           {formData.customLinks.map((customLink, index) => (
-            <div key={index} className="custom-link-item">
-              <div className="custom-link-number">Link {index + 1}</div>
+            <div key={customLink.clientId} className="custom-link-item">
+              <div className="custom-link-item-header">
+                <div className="custom-link-number">Link {index + 1}</div>
+                {formData.customLinks.length > 1 && (
+                  <button
+                    type="button"
+                    className="custom-link-remove"
+                    onClick={() => handleRemoveCustomLink(index)}
+                    title="Remove this link"
+                  >
+                    <FaTrash /> Remove
+                  </button>
+                )}
+              </div>
               <div className="custom-link-fields">
                 <div className="form-group">
                   <label htmlFor={`customLink_${index}_name`}>
@@ -962,9 +1023,26 @@ function RegistrationForm({ entity, onSave, onCancel, currentUser, onLogout }) {
                     <span className="error-message">{errors[`customLink_${index}_link`]}</span>
                   )}
                 </div>
+                <div className="form-group full-width custom-link-show-text">
+                  <label className="custom-link-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(customLink.showTextOnPage)}
+                      onChange={(e) => handleCustomLinkChange(index, 'showTextOnPage', e.target.checked)}
+                    />
+                    Show link name on public icons page
+                  </label>
+                </div>
               </div>
             </div>
           ))}
+          <button
+            type="button"
+            className="add-custom-link-button"
+            onClick={handleAddCustomLink}
+          >
+            <FaPlus /> Add another link
+          </button>
         </div>
       </div>
 

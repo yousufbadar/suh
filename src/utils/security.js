@@ -256,8 +256,9 @@ export const sanitizeFormData = (formData) => {
   if (formData.customLinks && Array.isArray(formData.customLinks)) {
     sanitized.customLinks = formData.customLinks.map((link) => ({
       name: link.name ? sanitizeText(link.name).trim() : '',
-      icon: link.icon || null, // Keep icon as-is (data URL or null)
-      link: link.link ? sanitizeUrl(link.link) : ''
+      icon: link.icon || null,
+      link: link.link ? sanitizeUrl(link.link) : '',
+      showTextOnPage: Boolean(link.showTextOnPage),
     }));
   }
   

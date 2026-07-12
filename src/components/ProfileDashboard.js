@@ -134,6 +134,7 @@ function ProfileDashboard({ entityId, onBack, onLogout, currentUser }) {
     twitch: '#9146ff',
     vimeo: '#1ab7ea',
     flickr: '#ff0084',
+    'google maps reviews': '#4285F4',
   };
 
   const getPlatformColor = (platform) => {

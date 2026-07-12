@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import './SocialMediaIconsPage.css';
 import SiteBanner from './SiteBanner';
 import { getEntityByUUID, trackQRScan, trackSocialClick, trackCustomLinkClick } from '../utils/storage';
+import { sortSocialPlatformKeys } from '../utils/socialPlatforms';
 import { getTheme, applyTheme } from '../utils/theme';
 import {
   FaFacebook,
@@ -24,6 +25,7 @@ import {
   FaSpinner,
 } from 'react-icons/fa';
 import { FaXTwitter } from 'react-icons/fa6';
+import { SiGooglemaps } from 'react-icons/si';
 
 const socialMediaPlatforms = {
   facebook: { name: 'Facebook', icon: FaFacebook, color: '#1877f2' },
@@ -44,6 +46,7 @@ const socialMediaPlatforms = {
   twitch: { name: 'Twitch', icon: FaTwitch, color: '#9146ff' },
   vimeo: { name: 'Vimeo', icon: FaVimeo, color: '#1ab7ea' },
   flickr: { name: 'Flickr', icon: FaFlickr, color: '#ff0084' },
+  'google maps reviews': { name: 'Google Maps Reviews', icon: SiGooglemaps, color: '#4285F4' },
 };
 
 function SocialMediaIconsPage({ uuid }) {
@@ -206,7 +209,7 @@ function SocialMediaIconsPage({ uuid }) {
     );
   }
 
-  const socialMediaLinks = Object.keys(entity.socialMedia || {});
+  const socialMediaLinks = sortSocialPlatformKeys(Object.keys(entity.socialMedia || {}));
   const customLinks = entity.customLinks || [];
 
   if (socialMediaLinks.length === 0 && customLinks.length === 0) {
@@ -275,22 +278,27 @@ function SocialMediaIconsPage({ uuid }) {
               <button
                 key={`custom-${index}`}
                 onClick={(e) => handleCustomLinkClick(e, index, customLink.link, entity.id)}
-                className="social-icon-button custom-link-button"
+                className={`custom-link-button${customLink.showTextOnPage ? ' custom-link-button-with-text' : ''}`}
                 title={customLink.name}
                 type="button"
                 aria-label={`Open ${customLink.name}`}
               >
-                {customLink.icon ? (
-                  <img 
-                    src={customLink.icon} 
-                    alt={`${customLink.name} icon`}
-                    className="custom-link-icon-image-page"
-                  />
-                ) : (
-                  <span className="custom-link-icon-placeholder">
-                    {customLink.name?.charAt(0) || '?'}
-                  </span>
-                )}
+                <div className="custom-link-button-content">
+                  {customLink.icon ? (
+                    <img 
+                      src={customLink.icon} 
+                      alt={`${customLink.name} icon`}
+                      className="custom-link-icon-image-page"
+                    />
+                  ) : (
+                    <span className="custom-link-icon-placeholder">
+                      {customLink.name?.charAt(0) || '?'}
+                    </span>
+                  )}
+                  {customLink.showTextOnPage && customLink.name && (
+                    <span className="custom-link-label">{customLink.name}</span>
+                  )}
+                </div>
               </button>
             );
           })}
