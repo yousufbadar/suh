@@ -17,6 +17,14 @@ let lastSubscriptionStatusCall = new Map();
 const SUBSCRIPTION_STATUS_CACHE_DURATION = 60000; // 60 seconds (1 minute)
 
 /**
+ * Whether the user has Pro access (paid, lifetime coupon, or active trial).
+ */
+export const hasProAccess = (status) => {
+  if (!status) return false;
+  return Boolean(status.isActive || status.isLifetime || status.trialActive);
+};
+
+/**
  * Get subscription status for a user (cached to reduce egress)
  */
 export const getSubscriptionStatus = async (userId, forceRefresh = false) => {
@@ -47,13 +55,14 @@ export const getSubscriptionStatus = async (userId, forceRefresh = false) => {
       .from('subscriptions')
       .select('is_active, trial_start_date, subscription_end_date, plan_type, status, last_payment_date, next_billing_date, billing_cycle')
       .eq('user_id', userId)
-      .single();
+      .maybeSingle();
 
-    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+    if (error) {
       console.error('Error fetching subscription:', error);
       return {
         hasSubscriptionRecord: false,
         isActive: false,
+        isLifetime: false,
         trialActive: false,
         trialDaysRemaining: 0,
         trialStartDate: null,
@@ -69,6 +78,7 @@ export const getSubscriptionStatus = async (userId, forceRefresh = false) => {
       return {
         hasSubscriptionRecord: false,
         isActive: false,
+        isLifetime: false,
         trialActive: false,
         trialDaysRemaining: 0,
         trialStartDate: null,
@@ -83,21 +93,24 @@ export const getSubscriptionStatus = async (userId, forceRefresh = false) => {
     const trialStartDate = data.trial_start_date ? new Date(data.trial_start_date) : null;
     const subscriptionEndDate = data.subscription_end_date ? new Date(data.subscription_end_date) : null;
 
+    const isLifetime = data.billing_cycle === 'lifetime' || data.status === 'lifetime';
+
     // Check if trial is active and compute remaining days
     let trialActive = false;
     let trialDaysRemaining = 0;
-    if (trialStartDate && !data.is_active) {
+    if (!isLifetime && trialStartDate && !data.is_active) {
       const daysSinceTrialStart = Math.floor((currentDate - trialStartDate) / (1000 * 60 * 60 * 24));
       trialActive = daysSinceTrialStart < TRIAL_DAYS;
       trialDaysRemaining = Math.max(0, TRIAL_DAYS - daysSinceTrialStart);
     }
 
     // Check if subscription is active
-    const isActive = data.is_active && subscriptionEndDate && subscriptionEndDate > currentDate;
+    const isActive = isLifetime || (data.is_active && subscriptionEndDate && subscriptionEndDate > currentDate);
 
     const status = {
       hasSubscriptionRecord: true,
       isActive,
+      isLifetime,
       trialActive,
       trialDaysRemaining,
       trialStartDate: trialStartDate?.toISOString() || null,
@@ -115,9 +128,10 @@ export const getSubscriptionStatus = async (userId, forceRefresh = false) => {
     return status;
   } catch (error) {
     console.error('Error getting subscription status:', error);
-    const defaultStatus = {
+    return {
       hasSubscriptionRecord: false,
       isActive: false,
+      isLifetime: false,
       trialActive: false,
       trialDaysRemaining: 0,
       trialStartDate: null,
@@ -126,11 +140,6 @@ export const getSubscriptionStatus = async (userId, forceRefresh = false) => {
       nextBillingDate: null,
       billingCycle: 'monthly',
     };
-    // Cache error result too (shorter duration) to prevent repeated failed calls
-    const errorCacheTime = Date.now();
-    subscriptionStatusCache.set(userId, defaultStatus);
-    lastSubscriptionStatusCall.set(userId, errorCacheTime);
-    return defaultStatus;
   }
 };
 

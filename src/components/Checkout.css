@@ -138,3 +138,54 @@
   margin: 0 0 1rem;
   color: var(--text-secondary, #555);
 }
+
+.checkout-payment-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.checkout-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 12px 10px;
+  border: 2px solid rgba(0, 0, 0, 0.12);
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #555;
+  transition: all 0.2s ease;
+}
+
+.checkout-tab:hover {
+  border-color: #059669;
+  color: #059669;
+}
+
+.checkout-tab--active {
+  border-color: #059669;
+  background: rgba(5, 150, 105, 0.08);
+  color: #059669;
+}
+
+.checkout-coupon-hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary, #666);
+  line-height: 1.4;
+}
+
+.checkout-coupon-input {
+  font-family: ui-monospace, monospace;
+  margin-bottom: 1rem;
+}
+
+.checkout-coupon-btn {
+  background: linear-gradient(135deg, #ffd700 0%, #32cd32 100%);
+  box-shadow: 0 4px 14px rgba(50, 205, 50, 0.3);
+}

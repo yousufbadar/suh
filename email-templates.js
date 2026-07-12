@@ -1,6 +1,6 @@
 /**
  * Build subject and HTML for notification emails.
- * Types: payment_receipt, subscription_activated, trial_started, subscription_cancelled, trial_ending_reminder, weekly_dashboard_summary
+ * Types: payment_receipt, subscription_activated, trial_started, subscription_cancelled, trial_ending_reminder, weekly_dashboard_summary, lifetime_coupon
  */
 function buildNotificationEmail(type, data = {}) {
   const siteName = data.siteName || 'Share Your Heart Today';
@@ -52,6 +52,27 @@ function buildNotificationEmail(type, data = {}) {
       return {
         subject: `Your weekly summary – ${siteName}`,
         html: baseHtml(`<h2>Weekly dashboard summary</h2><p>Here's your activity summary for <strong>${period}</strong>.</p><ul><li><strong>Profiles:</strong> ${profileCount}</li><li><strong>Total link/clicks:</strong> ${totalClicks}</li></ul><p><a href="${data.dashboardUrl || '#'}" class="btn">View dashboard</a></p>`),
+      };
+    }
+    case 'lifetime_coupon': {
+      const code = data.couponCode || '';
+      const codesHtml = String(code)
+        .split('\n')
+        .map((c) => c.trim())
+        .filter(Boolean)
+        .map((c) => `<li style="font-family:ui-monospace,monospace;font-size:15px;margin:6px 0;"><strong>${c}</strong></li>`)
+        .join('');
+      const note = data.notes ? `<p>${String(data.notes).replace(/</g, '&lt;')}</p>` : '';
+      return {
+        subject: `Your free lifetime access code – ${siteName}`,
+        html: baseHtml(
+          `<h2>You're invited to free lifetime Pro</h2>` +
+          `<p>Use the coupon code below when you create your account to unlock free Pro access for life.</p>` +
+          note +
+          `<ol style="padding-left:20px;">${codesHtml}</ol>` +
+          `<p>On the sign-up form, paste the code into the <strong>Coupon Code</strong> field.</p>` +
+          `<p><a href="${data.signupUrl || '#'}" class="btn">Create your account</a></p>`
+        ),
       };
     }
     default:

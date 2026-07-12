@@ -10,6 +10,8 @@ import SocialMediaIconsPage from './components/SocialMediaIconsPage';
 import ProfileDashboard from './components/ProfileDashboard';
 import ConfirmDialog from './components/ConfirmDialog';
 import Subscription from './components/Subscription';
+import AdminCoupons from './components/AdminCoupons';
+import AdminProfiles from './components/AdminProfiles';
 import SiteBanner from './components/SiteBanner';
 import Cart from './components/Cart';
 import Checkout from './components/Checkout';
@@ -17,7 +19,7 @@ import { useCart } from './context/CartContext';
 import { getEntities, deactivateEntity, reactivateEntity, deleteEntity } from './utils/storage';
 import { getTheme, applyTheme } from './utils/theme';
 import { supabase, isClientValid, testConnection } from './lib/supabase';
-import { getCurrentUser, logoutUser, clearUserCache } from './utils/auth';
+import { getCurrentUser, logoutUser, clearUserCache, userFromAuthUser, cacheUserFromAuth } from './utils/auth';
 import './utils/oauth-diagnostics'; // Load diagnostics helper
 
 const TRIAL_RESTRICTED_PAGES = ['list', 'view', 'dashboard', 'register'];
@@ -227,37 +229,38 @@ function App() {
         // Listen for auth changes
         try {
           const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
-            async (event, session) => {
+            (event, session) => {
               if (!isMounted) return;
-              
-              try {
-                console.log('🔐 Auth state changed:', event, session ? 'Session exists' : 'No session');
-                clearTimeout(safetyTimeout); // Clear safety timeout once auth state is determined
 
-                if (event === 'PASSWORD_RECOVERY') {
-                  console.log('🔐 Password recovery session detected');
-                  setShowResetPassword(true);
-                  setShowLogin(false);
-                  if (isMounted) {
-                    setIsLoadingAuth(false);
+              // Defer async work — calling supabase.auth.* inside this callback deadlocks signInWithPassword
+              setTimeout(async () => {
+                if (!isMounted) return;
+
+                try {
+                  console.log('🔐 Auth state changed:', event, session ? 'Session exists' : 'No session');
+                  clearTimeout(safetyTimeout);
+
+                  if (event === 'PASSWORD_RECOVERY') {
+                    console.log('🔐 Password recovery session detected');
+                    setShowResetPassword(true);
+                    setShowLogin(false);
+                    if (isMounted) {
+                      setIsLoadingAuth(false);
+                    }
+                    return;
                   }
-                  return;
-                }
-                
-                if (session) {
-                  console.log('✅ Session found, getting user...');
-                  // Only force refresh on SIGNED_IN event, otherwise use cache (max once per minute)
-                  const user = await getCurrentUser(event === 'SIGNED_IN');
-                  if (user) {
-                    console.log('✅ User retrieved:', user.email);
-                    // If user just logged in (SIGNED_IN event), navigate to profiles (list) page and update state
+
+                  if (session?.user) {
+                    const user = userFromAuthUser(session.user);
+                    cacheUserFromAuth(user);
+                    console.log('✅ User from session:', user?.email);
+
                     if (event === 'SIGNED_IN') {
                       console.log('🔄 SIGNED_IN event - updating user state and navigating to profiles list');
                       setCurrentPage('list');
                       setCurrentUser(user);
                       setShowLogin(false);
                     } else {
-                      // For other events (like TOKEN_REFRESHED), just update user if it changed
                       setCurrentUser(prevUser => {
                         if (!prevUser || prevUser.id !== user.id) {
                           console.log('🔄 Updating user state from auth listener');
@@ -267,36 +270,38 @@ function App() {
                       });
                       setShowLogin(false);
                     }
-                    // Load entities when user logs in
-                    // loadEntities will be called automatically by the useEffect that depends on currentUser
+                  } else if (session) {
+                    const user = await getCurrentUser(false);
+                    if (user) {
+                      setCurrentUser(prevUser => (!prevUser || prevUser.id !== user.id ? user : prevUser));
+                      setShowLogin(false);
+                    } else {
+                      setCurrentUser(null);
+                      setShowLogin(false);
+                    }
                   } else {
-                    console.warn('⚠️  Session exists but could not get user');
-                    setCurrentUser(null);
-                    setShowLogin(false);
-                  }
-                } else {
-                  console.log('ℹ️  No session, user logged out');
-                  // Clear user on SIGNED_OUT event or when session is null (stops any pending profile fetches)
-                  if (event === 'SIGNED_OUT' || event === 'USER_DELETED' || !session) {
-                    console.log('🔄 Clearing user state due to logout');
-                    currentUserRef.current = null;
-                    setCurrentUser(null);
-                    setShowLogin(false);
-                    setSubscriptionStatus(null);
-                    if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
-                      setEntities([]);
+                    console.log('ℹ️  No session, user logged out');
+                    if (event === 'SIGNED_OUT' || event === 'USER_DELETED' || !session) {
+                      console.log('🔄 Clearing user state due to logout');
+                      currentUserRef.current = null;
+                      setCurrentUser(null);
+                      setShowLogin(false);
+                      setSubscriptionStatus(null);
+                      if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
+                        setEntities([]);
+                      }
                     }
                   }
+                } catch (error) {
+                  console.error('❌ Error in auth state change handler:', error);
+                  setCurrentUser(null);
+                  setShowLogin(false);
+                } finally {
+                  if (isMounted) {
+                    setIsLoadingAuth(false);
+                  }
                 }
-              } catch (error) {
-                console.error('❌ Error in auth state change handler:', error);
-                setCurrentUser(null);
-                setShowLogin(false);
-              } finally {
-                if (isMounted) {
-                  setIsLoadingAuth(false);
-                }
-              }
+              }, 0);
             }
           );
           
@@ -396,7 +401,7 @@ function App() {
 
       try {
         const { getSubscriptionStatus, startTrial, clearSubscriptionStatusCache } = await import('./utils/subscription');
-        let status = await getSubscriptionStatus(currentUser.id);
+        let status = await getSubscriptionStatus(currentUser.id, true);
         // Start trial on signup day for users with no subscription record (e.g. first OAuth login)
         if (status && status.hasSubscriptionRecord === false) {
           try {
@@ -417,7 +422,10 @@ function App() {
     checkSubscription();
   }, [currentUser]);
 
-  const isTrialEnded = subscriptionStatus?.hasSubscriptionRecord && !subscriptionStatus?.trialActive && !subscriptionStatus?.isActive;
+  const isTrialEnded = subscriptionStatus?.hasSubscriptionRecord
+    && !subscriptionStatus?.trialActive
+    && !subscriptionStatus?.isActive
+    && !subscriptionStatus?.isLifetime;
 
   // Redirect to upgrade when trial has ended and user is on a restricted page
   useEffect(() => {
@@ -464,18 +472,7 @@ function App() {
       console.log('   - Show login: false');
       console.log('   - Current user:', user?.email);
 
-      // Wait a moment for session to be fully established (but don't block navigation)
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // Verify session exists (for logging/debugging, but don't block on it)
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) {
-        console.error('❌ Error getting session in login success:', sessionError);
-      } else if (session) {
-        console.log('✅ Session verified in login success handler');
-      } else {
-        console.warn('⚠️  Login success but no session found yet - auth state listener will handle it');
-      }
+      cacheUserFromAuth(user);
 
       // Load entities asynchronously (don't block navigation)
       loadEntities().catch(err => {
@@ -695,6 +692,21 @@ function App() {
     }
   }, [currentUser?.email]);
 
+  const handleCouponApplied = useCallback(async (userId) => {
+    try {
+      const { getSubscriptionStatus, clearSubscriptionStatusCache } = await import('./utils/subscription');
+      clearSubscriptionStatusCache(userId);
+      const status = await getSubscriptionStatus(userId, true);
+      setSubscriptionStatus(status);
+      if (status?.isActive || status?.isLifetime) {
+        setCurrentPage((page) => (page === 'subscription' || page === 'checkout' || page === 'cart' ? 'home' : page));
+      }
+    } catch (err) {
+      console.error('Error refreshing subscription after coupon:', err);
+      throw err;
+    }
+  }, []);
+
   // Payment link success redirect: we're in a popup; show closing message (postMessage already sent in usePaymentSuccessPopup)
   if (isPaymentSuccessPopup) {
     return (
@@ -749,6 +761,38 @@ function App() {
     return <SocialMediaIconsPage uuid={uuid} />;
   }
 
+  if (currentPage === 'admin-profiles') {
+    return (
+      <div className="App">
+        <SiteBanner compact onLogoClick={() => setCurrentPage('home')} />
+        {currentUser?.isAdmin ? (
+          <AdminProfiles onBack={() => setCurrentPage('home')} />
+        ) : (
+          <div style={{ padding: '2rem', textAlign: 'center' }}>
+            <p>Admin access required.</p>
+            <button type="button" onClick={() => setCurrentPage('home')}>Go home</button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (currentPage === 'admin-coupons') {
+    return (
+      <div className="App">
+        <SiteBanner compact onLogoClick={() => setCurrentPage('home')} />
+        {currentUser?.isAdmin ? (
+          <AdminCoupons onBack={() => setCurrentPage('home')} />
+        ) : (
+          <div style={{ padding: '2rem', textAlign: 'center' }}>
+            <p>Admin access required.</p>
+            <button type="button" onClick={() => setCurrentPage('home')}>Go home</button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   // Render home page - public access (no authentication required)
   // Note: User session is preserved when navigating to home
   // Check home page FIRST before checking protected pages to ensure navigation works
@@ -791,6 +835,12 @@ function App() {
     const handleViewSubscription = () => {
       setCurrentPage('subscription');
     };
+    const handleAdminCoupons = () => {
+      setCurrentPage('admin-coupons');
+    };
+    const handleAdminProfiles = () => {
+      setCurrentPage('admin-profiles');
+    };
     return (
       <Home 
         onGetStarted={handleGetStarted} 
@@ -800,6 +850,8 @@ function App() {
         onCreateProfile={handleCreateProfile}
         onViewDashboard={handleViewDashboardFromHome}
         onViewSubscription={handleViewSubscription}
+        onAdminCoupons={currentUser?.isAdmin ? handleAdminCoupons : undefined}
+        onAdminProfiles={currentUser?.isAdmin ? handleAdminProfiles : undefined}
         onLogout={handleLogout}
         entities={entities}
         subscriptionStatus={subscriptionStatus}
@@ -813,7 +865,7 @@ function App() {
   };
 
   // Show login screen if not authenticated (for protected pages like list, register, view, dashboard, subscription)
-  const protectedPages = ['list', 'register', 'view', 'dashboard', 'subscription'];
+  const protectedPages = ['list', 'register', 'view', 'dashboard', 'subscription', 'admin-coupons', 'admin-profiles'];
   if (!currentUser && protectedPages.includes(currentPage)) {
     return (
       <div className="App">
@@ -890,6 +942,24 @@ function App() {
           >
             Cart {cartCount > 0 && <span className="nav-cart-badge">{cartCount}</span>}
           </button>
+          {currentUser?.isAdmin && (
+            <>
+              <button
+                type="button"
+                onClick={() => setCurrentPage('admin-profiles')}
+                className={`nav-button ${currentPage === 'admin-profiles' ? 'active' : ''}`}
+              >
+                All Profiles
+              </button>
+              <button
+                type="button"
+                onClick={() => setCurrentPage('admin-coupons')}
+                className={`nav-button ${currentPage === 'admin-coupons' ? 'active' : ''}`}
+              >
+                Coupons
+              </button>
+            </>
+          )}
           {currentUser && (
             <button
               type="button"
@@ -976,6 +1046,7 @@ function App() {
                   onBack={() => setCurrentPage('home')}
                   onNavigateToCart={() => setCurrentPage('cart')}
                   currentUser={currentUser}
+                  parentSubscriptionStatus={subscriptionStatus}
                   onLogout={handleLogout}
                   onSubscriptionSuccess={() => {
                     // Refresh subscription status and redirect to home
@@ -1006,6 +1077,7 @@ function App() {
               <Checkout
                 currentUser={currentUser}
                 onSubscriptionPaid={handleSubscriptionPaid}
+                onCouponApplied={handleCouponApplied}
                 onSuccess={() => setCurrentPage('home')}
                 onBack={() => setCurrentPage('cart')}
               />

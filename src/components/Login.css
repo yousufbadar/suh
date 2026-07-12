@@ -329,6 +329,19 @@
   line-height: 1.5;
 }
 
+.field-hint {
+  color: #888;
+  font-size: 0.8rem;
+  margin-top: 5px;
+  display: block;
+}
+
+.optional-label {
+  font-weight: 400;
+  color: #888;
+  font-size: 0.85rem;
+}
+
 .back-link {
   display: inline-flex;
   align-items: center;

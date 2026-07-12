@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useCart } from '../context/CartContext';
+import { checkCouponCode, redeemCouponCode, isValidCouponFormat } from '../utils/coupon';
+import { clearSubscriptionStatusCache } from '../utils/subscription';
+import { FaCreditCard, FaTicketAlt } from 'react-icons/fa';
 import './Checkout.css';
 
 const SQUARE_SDK_SANDBOX = 'https://sandbox.web.squarecdn.com/v1/square.js';
@@ -14,8 +17,10 @@ const getBackendUrl = () => {
   return '';
 };
 
-function Checkout({ onSuccess, onBack, currentUser, onSubscriptionPaid }) {
+function Checkout({ onSuccess, onBack, currentUser, onSubscriptionPaid, onCouponApplied }) {
   const { items, totalCents, clearCart } = useCart();
+  const [paymentMode, setPaymentMode] = useState('card');
+  const [couponCode, setCouponCode] = useState('');
   const [config, setConfig] = useState(null);
   const [squareCard, setSquareCard] = useState(null);
   const [isInitializing, setIsInitializing] = useState(true);
@@ -34,8 +39,12 @@ function Checkout({ onSuccess, onBack, currentUser, onSubscriptionPaid }) {
     postalCode: '',
   });
 
-  // Fetch backend config (applicationId, locationId, sandbox)
+  // Fetch backend config (applicationId, locationId, sandbox) — card payments only
   useEffect(() => {
+    if (paymentMode !== 'card') {
+      setIsInitializing(false);
+      return;
+    }
     const backendUrl = getBackendUrl();
     if (!backendUrl || totalCents < 1) {
       if (totalCents < 1) setError('Cart is empty.');
@@ -68,11 +77,11 @@ function Checkout({ onSuccess, onBack, currentUser, onSubscriptionPaid }) {
         setError(err.message || 'Failed to load payment config.');
         setIsInitializing(false);
       });
-  }, [totalCents]);
+  }, [totalCents, paymentMode]);
 
   // Load Square SDK from sandbox or production URL, then attach card after 350ms
   useEffect(() => {
-    if (!config || totalCents < 1) return;
+    if (paymentMode !== 'card' || !config || totalCents < 1) return;
 
     const scriptUrl = config.sandbox ? SQUARE_SDK_SANDBOX : SQUARE_SDK_PRODUCTION;
 
@@ -143,7 +152,68 @@ function Checkout({ onSuccess, onBack, currentUser, onSubscriptionPaid }) {
       if (el) el.innerHTML = '';
       setSquareCard(null);
     };
-  }, [config, totalCents]);
+  }, [config, totalCents, paymentMode]);
+
+  const handleApplyCoupon = async () => {
+    setError(null);
+    const trimmed = couponCode.trim();
+    if (!trimmed) {
+      setError('Please enter a coupon code');
+      return;
+    }
+    if (!isValidCouponFormat(trimmed)) {
+      setError('Coupon code must be a valid UUID');
+      return;
+    }
+    if (!currentUser?.id) {
+      setError('You must be signed in to use a coupon code');
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      const check = await checkCouponCode(trimmed);
+      if (!check.valid) {
+        setError(check.error || 'Invalid coupon code');
+        setIsProcessing(false);
+        return;
+      }
+
+      const result = await redeemCouponCode(currentUser.id, trimmed);
+      if (!result.success) {
+        setError(result.error || 'Failed to apply coupon');
+        setIsProcessing(false);
+        return;
+      }
+
+      clearSubscriptionStatusCache(currentUser.id);
+      if (onCouponApplied) {
+        await onCouponApplied(currentUser.id);
+      }
+
+      if (currentUser.email) {
+        try {
+          const { sendSubscriptionActivated } = await import('../utils/notificationEmail');
+          sendSubscriptionActivated(currentUser.email, {
+            billingCycle: 'lifetime',
+            nextBillingDate: null,
+          });
+        } catch (e) {
+          console.warn('Subscription activated email send failed:', e);
+        }
+      }
+
+      clearCart();
+      setSubscriptionActivated(true);
+      setSuccess(true);
+      if (onSuccess) setTimeout(onSuccess, 1500);
+    } catch (err) {
+      console.error('Coupon checkout error:', err);
+      setError(err.message || 'Failed to apply coupon');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const handlePay = async () => {
     if (!squareCard || totalCents < 1) return;
@@ -269,9 +339,9 @@ function Checkout({ onSuccess, onBack, currentUser, onSubscriptionPaid }) {
   if (success) {
     return (
       <div className="checkout-page checkout-success">
-        <h2>Payment successful</h2>
+        <h2>{subscriptionActivated ? 'Subscription activated' : 'Payment successful'}</h2>
         {subscriptionActivated ? (
-          <p>Your Pro subscription is now active. You have access to all features.</p>
+          <p>Your Pro access is now active. You have access to all features.</p>
         ) : (
           <p>Thank you for your order.</p>
         )}
@@ -299,6 +369,54 @@ function Checkout({ onSuccess, onBack, currentUser, onSubscriptionPaid }) {
           Total: <strong>${(totalCents / 100).toFixed(2)}</strong>
         </p>
       </div>
+
+      <div className="checkout-payment-tabs">
+        <button
+          type="button"
+          className={`checkout-tab ${paymentMode === 'card' ? 'checkout-tab--active' : ''}`}
+          onClick={() => { setPaymentMode('card'); setError(null); }}
+        >
+          <FaCreditCard /> Pay with card
+        </button>
+        <button
+          type="button"
+          className={`checkout-tab ${paymentMode === 'coupon' ? 'checkout-tab--active' : ''}`}
+          onClick={() => { setPaymentMode('coupon'); setError(null); }}
+        >
+          <FaTicketAlt /> Use coupon code
+        </button>
+      </div>
+
+      {paymentMode === 'coupon' ? (
+        <div className="checkout-form">
+          <p className="checkout-form-label">Lifetime coupon code</p>
+          <p className="checkout-coupon-hint">
+            Enter a UUID coupon for free lifetime Pro access — no payment required.
+          </p>
+          <input
+            type="text"
+            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+            value={couponCode}
+            onChange={(e) => {
+              setCouponCode(e.target.value);
+              if (error) setError(null);
+            }}
+            className="checkout-input checkout-coupon-input"
+            maxLength={36}
+            spellCheck={false}
+            autoComplete="off"
+          />
+          {error && <p className="checkout-error">{error}</p>}
+          <button
+            type="button"
+            onClick={handleApplyCoupon}
+            disabled={isProcessing || !couponCode.trim()}
+            className="checkout-pay-btn checkout-coupon-btn"
+          >
+            {isProcessing ? 'Applying…' : 'Apply coupon'}
+          </button>
+        </div>
+      ) : (
       <div className="checkout-form">
         <p className="checkout-form-label">Billing (optional)</p>
         <div className="checkout-billing">
@@ -367,6 +485,7 @@ function Checkout({ onSuccess, onBack, currentUser, onSubscriptionPaid }) {
           {isProcessing ? 'Processing…' : `Pay $${(totalCents / 100).toFixed(2)}`}
         </button>
       </div>
+      )}
     </div>
   );
 }

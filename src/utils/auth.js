@@ -1,10 +1,23 @@
 // Authentication utilities using Supabase Auth
 
 import { supabase } from '../lib/supabase';
-import { startTrial } from './subscription';
+import { startTrial, clearSubscriptionStatusCache, getSubscriptionStatus } from './subscription';
+import { checkCouponCode, redeemCouponCode } from './coupon';
+
+const ADMIN_EMAILS = (process.env.REACT_APP_ADMIN_EMAILS || 'admin@admin.com,yousufbadar@gmail.com')
+  .split(',')
+  .map((e) => e.trim().toLowerCase())
+  .filter(Boolean);
+
+export const isAdminFromUser = (user) => {
+  if (!user) return false;
+  const role = user.app_metadata?.role || user.user_metadata?.role || '';
+  if (String(role).toLowerCase() === 'admin') return true;
+  return ADMIN_EMAILS.includes(String(user.email || '').toLowerCase());
+};
 
 // Register new user with Supabase
-export const registerUser = async (email, password, username) => {
+export const registerUser = async (email, password, username, couponCode = null) => {
   // Validate inputs
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     throw new Error('Please enter a valid email address');
@@ -12,6 +25,14 @@ export const registerUser = async (email, password, username) => {
   
   if (!password || password.length < 6) {
     throw new Error('Password must be at least 6 characters');
+  }
+
+  const trimmedCoupon = (couponCode || '').trim();
+  if (trimmedCoupon) {
+    const couponCheck = await checkCouponCode(trimmedCoupon);
+    if (!couponCheck.valid) {
+      throw new Error(couponCheck.error || 'Invalid coupon code');
+    }
   }
 
   // Sign up with Supabase
@@ -29,12 +50,24 @@ export const registerUser = async (email, password, username) => {
     throw new Error(error.message || 'Registration failed');
   }
   
-  // Start trial on signup day (trial period begins the day user signs up)
+  // Start trial or activate lifetime access from coupon
   if (data.user?.id) {
     try {
-      await startTrial(data.user.id);
-    } catch (trialErr) {
-      console.warn('Trial start on signup failed (user still registered):', trialErr);
+      if (trimmedCoupon) {
+        const redeemResult = await redeemCouponCode(data.user.id, trimmedCoupon);
+        if (!redeemResult.success) {
+          throw new Error(redeemResult.error || 'Failed to redeem coupon code');
+        }
+        clearSubscriptionStatusCache(data.user.id);
+        await getSubscriptionStatus(data.user.id, true);
+      } else {
+        await startTrial(data.user.id);
+      }
+    } catch (subErr) {
+      console.warn('Subscription setup on signup failed (user still registered):', subErr);
+      if (trimmedCoupon) {
+        throw new Error(subErr.message || 'Account created but coupon could not be applied. Please contact support.');
+      }
     }
   }
   
@@ -46,7 +79,8 @@ export const registerUser = async (email, password, username) => {
     id: data.user?.id,
     email: data.user?.email,
     username: extractedUsername,
-    name: extractedName
+    name: extractedName,
+    isAdmin: isAdminFromUser(data.user),
   };
 };
 
@@ -97,33 +131,44 @@ export const loginUser = async (email, password) => {
     }
 
     console.log('✅ Login successful for:', data.user.email);
-    
-    // Extract username/name from user metadata
-    const username = data.user.user_metadata?.username || 
-                     data.user.user_metadata?.full_name || 
-                     data.user.user_metadata?.name ||
-                     email.split('@')[0];
 
-    const user = {
-      id: data.user.id,
-      email: data.user.email,
-      username: username,
-      name: data.user.user_metadata?.full_name || data.user.user_metadata?.name || username
-    };
-    
-    // Verify session was created
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      console.warn('⚠️  Login succeeded but no session found');
-    } else {
-      console.log('✅ Session created successfully');
-    }
-    
+    const user = userFromAuthUser(data.user);
+    cacheUserFromAuth(user);
     return user;
   } catch (error) {
     console.error('❌ Login failed:', error);
     throw error;
   }
+};
+
+// Build app user object from Supabase auth user (no extra API calls)
+export const userFromAuthUser = (authUser) => {
+  if (!authUser) return null;
+
+  const username = authUser.user_metadata?.username ||
+                   authUser.user_metadata?.full_name ||
+                   authUser.user_metadata?.name ||
+                   authUser.user_metadata?.preferred_username ||
+                   authUser.email?.split('@')[0];
+
+  return {
+    id: authUser.id,
+    email: authUser.email,
+    username,
+    name: authUser.user_metadata?.full_name || authUser.user_metadata?.name || authUser.user_metadata?.preferred_username || username,
+    isAdmin: isAdminFromUser(authUser),
+  };
+};
+
+// Cache for getCurrentUser to limit API calls to once per minute
+let lastGetUserCall = null;
+let cachedUserResult = null;
+const GET_USER_CACHE_DURATION = 60000; // 60 seconds (1 minute)
+
+export const cacheUserFromAuth = (user) => {
+  if (!user) return;
+  lastGetUserCall = Date.now();
+  cachedUserResult = user;
 };
 
 // Clear getCurrentUser cache (call on logout so cached user isn't restored)
@@ -140,11 +185,6 @@ export const logoutUser = async () => {
     throw new Error(error.message || 'Logout failed');
   }
 };
-
-// Cache for getCurrentUser to limit API calls to once per minute
-let lastGetUserCall = null;
-let cachedUserResult = null;
-const GET_USER_CACHE_DURATION = 60000; // 60 seconds (1 minute)
 
 // Get current user (rate limited to once per minute)
 export const getCurrentUser = async (forceRefresh = false) => {
@@ -207,7 +247,8 @@ export const getCurrentUser = async (forceRefresh = false) => {
       id: user.id,
       email: user.email,
       username: username,
-      name: user.user_metadata?.full_name || user.user_metadata?.name || user.user_metadata?.preferred_username || username
+      name: user.user_metadata?.full_name || user.user_metadata?.name || user.user_metadata?.preferred_username || username,
+      isAdmin: isAdminFromUser(user),
     };
 
     // Cache the result

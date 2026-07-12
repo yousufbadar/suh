@@ -106,3 +106,16 @@ node scripts/weekly-email-summary.js --trial
   ```
 
 Ensure the backend is running (or that `BACKEND_API_URL` points to a running backend) when the script runs, and that `RESEND_API_KEY` and `EMAIL_FROM` are set in the backend’s environment so emails are actually sent.
+
+## Admin: lifetime coupon emails
+
+Admins can generate UUID coupons and email them from the app (**Coupons** in the nav / home, when signed in as admin).
+
+Requirements:
+
+- Migration `007_coupon_codes.sql` applied
+- Backend running with `SUPABASE_SERVICE_ROLE_KEY`, `REACT_APP_SUPABASE_URL`, `REACT_APP_SUPABASE_ANON_KEY`
+- `RESEND_API_KEY` + `EMAIL_FROM` for sending
+- Admin user: `user_metadata.role = admin` (see `scripts/create-admin-user.js`) or email listed in `ADMIN_EMAILS` / `REACT_APP_ADMIN_EMAILS` (default includes `admin@admin.com`)
+
+API: `GET/POST /api/admin-coupons` (Bearer session token required).

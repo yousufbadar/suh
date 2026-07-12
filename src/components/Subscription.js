@@ -5,12 +5,12 @@ import ConfirmDialog from './ConfirmDialog';
 import { useCart } from '../context/CartContext';
 import { PRODUCTS } from '../context/CartContext';
 
-function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess, onNavigateToCart }) {
+function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess, onNavigateToCart, parentSubscriptionStatus }) {
   const { addToCart } = useCart();
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
   const [trialDaysRemaining, setTrialDaysRemaining] = useState(30);
-  const [subscriptionStatus, setSubscriptionStatus] = useState(null);
+  const [subscriptionStatus, setSubscriptionStatus] = useState(parentSubscriptionStatus || null);
   const [squareCard, setSquareCard] = useState(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const [initStatus, setInitStatus] = useState('Initializing...');
@@ -70,7 +70,7 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess, on
   // Load Square Web Payments SDK only when payment form is shown (not on summary, and not when starting trial only)
   // Trial requires no payment; payment form only for subscribing after trial or converting to paid
   useEffect(() => {
-    const showSummary = subscriptionStatus && (subscriptionStatus.isActive || subscriptionStatus.trialActive);
+    const showSummary = subscriptionStatus && (subscriptionStatus.isActive || subscriptionStatus.isLifetime || subscriptionStatus.trialActive);
     const startTrialOnly = subscriptionStatus && subscriptionStatus.hasSubscriptionRecord === false;
     if (showSummary || startTrialOnly) {
       setError(null);
@@ -363,6 +363,13 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess, on
     };
   }, [subscriptionStatus, currentUser]);
 
+  // Sync with App-level subscription status (e.g. after coupon redemption)
+  useEffect(() => {
+    if (parentSubscriptionStatus) {
+      setSubscriptionStatus(parentSubscriptionStatus);
+    }
+  }, [parentSubscriptionStatus]);
+
   // Check subscription status and trial
   useEffect(() => {
     const checkSubscriptionStatus = async () => {
@@ -370,7 +377,7 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess, on
 
       try {
         const { getSubscriptionStatus } = await import('../utils/subscription');
-        const status = await getSubscriptionStatus(currentUser.id);
+        const status = await getSubscriptionStatus(currentUser.id, true);
         setSubscriptionStatus(status);
 
         if (status.trialActive) {
@@ -391,7 +398,7 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess, on
   // Fetch payment history when showing subscription summary
   useEffect(() => {
     const fetchPayments = async () => {
-      if (!currentUser || (!subscriptionStatus?.isActive && !subscriptionStatus?.trialActive)) return;
+      if (!currentUser || (!subscriptionStatus?.isActive && !subscriptionStatus?.isLifetime && !subscriptionStatus?.trialActive)) return;
       setLoadingPayments(true);
       try {
         const { getPaymentHistory } = await import('../utils/subscriptionTracking');
@@ -405,7 +412,7 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess, on
       }
     };
     fetchPayments();
-  }, [currentUser, subscriptionStatus?.isActive, subscriptionStatus?.trialActive]);
+  }, [currentUser, subscriptionStatus?.isActive, subscriptionStatus?.isLifetime, subscriptionStatus?.trialActive]);
 
   const handleCancelSubscriptionClick = () => {
     setShowCancelConfirmDialog(true);
@@ -611,9 +618,11 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess, on
     }
   };
 
-  const isSubscribed = subscriptionStatus?.isActive || false;
+  const isLifetime = subscriptionStatus?.isLifetime || subscriptionStatus?.billingCycle === 'lifetime';
+  const isSubscribed = subscriptionStatus?.isActive || isLifetime || false;
   const isTrialActive = subscriptionStatus?.trialActive || false;
-  const isTrialEnded = subscriptionStatus?.hasSubscriptionRecord && !subscriptionStatus?.trialActive && !subscriptionStatus?.isActive;
+  const hasAccess = isSubscribed || isTrialActive;
+  const isTrialEnded = subscriptionStatus?.hasSubscriptionRecord && !isTrialActive && !isSubscribed;
 
   return (
     <div className="subscription-page">
@@ -659,13 +668,13 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess, on
         )}
         <div className="subscription-title-section">
           <h1 className="subscription-title">
-            {isTrialEnded ? 'Trial Ended' : (isSubscribed || isTrialActive) ? 'Subscription summary' : 'Upgrade to Pro'}
+            {isTrialEnded ? 'Trial Ended' : hasAccess ? 'Subscription summary' : 'Upgrade to Pro'}
           </h1>
           <p className="subscription-subtitle">
             {isTrialEnded ? (
               <>Your free trial has ended. Subscribe now to restore access to all Pro features—profiles, dashboard, and more.</>
             ) : isSubscribed ? (
-              <>You're subscribed to Pro! 🎉</>
+              isLifetime ? <>You have <strong>lifetime Pro access</strong> from your coupon! 🎉</> : <>You're subscribed to Pro! 🎉</>
             ) : isTrialActive && trialDaysRemaining > 0 ? (
               <>Your <strong>30-day free trial</strong> is active. {trialDaysRemaining} day{trialDaysRemaining !== 1 ? 's' : ''} remaining.</>
             ) : (
@@ -720,10 +729,12 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess, on
           <div className="subscription-plan-card popular">
             <div className="subscription-status" style={{ padding: '1.5rem 0' }}>
               <div className="status-badge active" style={{ fontSize: '1.1rem', padding: '0.75rem 1.25rem' }}>
-                <FaCrown /> {isSubscribed ? 'Active Subscription' : `Trial: ${trialDaysRemaining} day${trialDaysRemaining !== 1 ? 's' : ''} remaining`}
+                <FaCrown /> {isLifetime ? 'Lifetime Pro' : isSubscribed ? 'Active Subscription' : `Trial: ${trialDaysRemaining} day${trialDaysRemaining !== 1 ? 's' : ''} remaining`}
               </div>
               <p style={{ marginTop: '1rem', color: 'var(--text-secondary, #666)', fontSize: '0.95rem' }}>
-                {isSubscribed
+                {isLifetime
+                  ? 'Your lifetime Pro plan is active. You have permanent access to all premium features.'
+                  : isSubscribed
                   ? 'Your Pro plan is active. You have access to all premium features.'
                   : `You have ${trialDaysRemaining} day${trialDaysRemaining !== 1 ? 's' : ''} left in your free trial. Subscribe before it ends to keep Pro access.`}
               </p>
@@ -734,7 +745,9 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess, on
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       {isSubscribed ? <FaCrown style={{ opacity: 0.8 }} /> : <FaRocket style={{ opacity: 0.8 }} />}
                       <strong>Plan:</strong>{' '}
-                      {isSubscribed
+                      {isLifetime
+                        ? 'Lifetime Pro'
+                        : isSubscribed
                         ? (subscriptionStatus?.planType
                             ? String(subscriptionStatus.planType).charAt(0).toUpperCase() + String(subscriptionStatus.planType).slice(1)
                             : 'Pro')
@@ -744,8 +757,10 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess, on
                   {(subscriptionStatus?.subscriptionEndDate || subscriptionStatus?.nextBillingDate) && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <FaCalendarAlt style={{ opacity: 0.8 }} />
-                      <strong>{isSubscribed ? 'Next billing:' : 'Trial ends:'}</strong>{' '}
-                      {new Date(subscriptionStatus?.nextBillingDate || subscriptionStatus?.subscriptionEndDate).toLocaleDateString(undefined, { dateStyle: 'medium' })}
+                      <strong>{isLifetime ? 'Access:' : isSubscribed ? 'Next billing:' : 'Trial ends:'}</strong>{' '}
+                      {isLifetime
+                        ? 'Lifetime (no expiration)'
+                        : new Date(subscriptionStatus?.nextBillingDate || subscriptionStatus?.subscriptionEndDate).toLocaleDateString(undefined, { dateStyle: 'medium' })}
                     </div>
                   )}
                   {subscriptionStatus?.billingCycle && isSubscribed && (
@@ -813,6 +828,7 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess, on
                 </div>
               )}
 
+              {!isLifetime && (
               <button
                 type="button"
                 onClick={handleCancelSubscriptionClick}
@@ -829,11 +845,13 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess, on
               >
                 {isCancelling ? 'Cancelling...' : 'Cancel subscription'}
               </button>
+              )}
             </div>
           </div>
         </div>
       ) : null}
 
+      {!hasAccess && (
       <div className="subscription-footer">
         <p className="trial-info">
           <FaRocket /> <strong>30-day free trial</strong> — no payment required. After the trial, subscribe to keep Pro access. Cancel anytime.
@@ -842,6 +860,7 @@ function Subscription({ onBack, currentUser, onLogout, onSubscriptionSuccess, on
           <FaLock /> When you subscribe, payment is processed securely by Square.
         </p>
       </div>
+      )}
     </div>
   );
 }

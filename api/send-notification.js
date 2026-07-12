@@ -37,7 +37,7 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ success: false, error: 'Valid "to" email is required' });
   }
 
-  const allowedTypes = ['payment_receipt', 'subscription_activated', 'trial_started', 'subscription_cancelled', 'trial_ending_reminder', 'weekly_dashboard_summary'];
+  const allowedTypes = ['payment_receipt', 'subscription_activated', 'trial_started', 'subscription_cancelled', 'trial_ending_reminder', 'weekly_dashboard_summary', 'lifetime_coupon'];
   const notificationType = allowedTypes.includes(type) ? type : 'weekly_dashboard_summary';
   const { subject, html } = buildNotificationEmail(notificationType, data);
   const emailFrom = env('EMAIL_FROM') || 'Share Your Heart Today <onboarding@resend.dev>';

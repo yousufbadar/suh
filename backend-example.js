@@ -102,8 +102,8 @@ app.use(express.json());
 
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGIN || '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.sendStatus(200);
   next();
 });
@@ -451,7 +451,7 @@ app.post('/api/send-notification', async (req, res) => {
   if (!to || typeof to !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
     return res.status(400).json({ success: false, error: 'Valid "to" email is required' });
   }
-  const allowedTypes = ['payment_receipt', 'subscription_activated', 'trial_started', 'subscription_cancelled', 'trial_ending_reminder', 'weekly_dashboard_summary'];
+  const allowedTypes = ['payment_receipt', 'subscription_activated', 'trial_started', 'subscription_cancelled', 'trial_ending_reminder', 'weekly_dashboard_summary', 'lifetime_coupon'];
   const notificationType = allowedTypes.includes(type) ? type : 'weekly_dashboard_summary';
   const { subject, html } = buildNotificationEmail(notificationType, data || {});
 
@@ -479,6 +479,319 @@ app.post('/api/send-notification', async (req, res) => {
   }
 });
 
+/** Admin coupon helpers (shared with Vercel api/admin-coupons.js patterns) */
+function isAdminUser(user) {
+  if (!user) return false;
+  const role = user.app_metadata?.role || user.user_metadata?.role || '';
+  if (String(role).toLowerCase() === 'admin') return true;
+  const adminEmails = (env('ADMIN_EMAILS') || 'admin@admin.com,yousufbadar@gmail.com')
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  return adminEmails.includes(String(user.email || '').toLowerCase());
+}
+
+function getSupabaseAdmin() {
+  const url = env('REACT_APP_SUPABASE_URL') || env('SUPABASE_URL');
+  const serviceKey = env('SUPABASE_SERVICE_ROLE_KEY');
+  if (!url || !serviceKey) return null;
+  const { createClient } = require('@supabase/supabase-js');
+  return createClient(url, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
+function getSupabaseAnon() {
+  const url = env('REACT_APP_SUPABASE_URL') || env('SUPABASE_URL');
+  const anonKey = env('REACT_APP_SUPABASE_ANON_KEY') || env('SUPABASE_ANON_KEY');
+  if (!url || !anonKey) return null;
+  const { createClient } = require('@supabase/supabase-js');
+  return createClient(url, anonKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
+async function requireAdminExpress(req) {
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+  if (!token) return { error: 'Authorization required', status: 401 };
+  const anon = getSupabaseAnon();
+  if (!anon) return { error: 'Supabase not configured', status: 500 };
+  const { data, error } = await anon.auth.getUser(token);
+  if (error || !data?.user) return { error: 'Invalid or expired session', status: 401 };
+  if (!isAdminUser(data.user)) return { error: 'Admin access required', status: 403 };
+  return { user: data.user };
+}
+
+async function enrichCouponsWithRedeemer(admin, coupons) {
+  if (!coupons?.length) return coupons || [];
+  const needsLookup = coupons.filter((c) => c.redeemed_by_user_id && !c.redeemed_by_email);
+  const userIds = [...new Set(needsLookup.map((c) => c.redeemed_by_user_id))];
+  const emailById = {};
+  await Promise.all(userIds.map(async (id) => {
+    try {
+      const { data } = await admin.auth.admin.getUserById(id);
+      if (data?.user?.email) {
+        emailById[id] = data.user.email;
+      }
+    } catch (_) {
+      /* ignore lookup failures */
+    }
+  }));
+  return coupons.map((c) => ({
+    ...c,
+    redeemed_by_email: c.redeemed_by_email
+      || (c.redeemed_by_user_id ? emailById[c.redeemed_by_user_id] || null : null),
+  }));
+}
+
+/** GET/POST /api/admin-coupons — list or generate lifetime coupons (admin only) */
+app.all('/api/admin-coupons', async (req, res) => {
+  if (req.method === 'OPTIONS') return res.status(200).end();
+
+  const auth = await requireAdminExpress(req);
+  if (auth.error) {
+    return res.status(auth.status).json({ success: false, error: auth.error });
+  }
+
+  const admin = getSupabaseAdmin();
+  if (!admin) {
+    return res.status(500).json({
+      success: false,
+      error: 'SUPABASE_SERVICE_ROLE_KEY is required to manage coupons',
+    });
+  }
+
+  if (req.method === 'GET') {
+    const { data, error } = await admin
+      .from('coupon_codes')
+      .select('id, code, coupon_type, max_uses, times_used, is_active, redeemed_by_user_id, redeemed_by_email, redeemed_at, notes, created_at, expires_at')
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (error) return res.status(500).json({ success: false, error: error.message });
+    const enriched = await enrichCouponsWithRedeemer(admin, data || []);
+    return res.json({ success: true, coupons: enriched });
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ success: false, error: 'Method not allowed' });
+  }
+
+  const body = req.body || {};
+  const email = (body.email || '').trim();
+  const notes = (body.notes || '').trim() || null;
+  const sendEmail = body.sendEmail !== false;
+  const count = Math.min(Math.max(parseInt(body.count, 10) || 1, 1), 20);
+
+  if (sendEmail && email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ success: false, error: 'Valid recipient email is required' });
+  }
+  if (sendEmail && !email) {
+    return res.status(400).json({ success: false, error: 'Recipient email is required to send the coupon' });
+  }
+
+  const rows = Array.from({ length: count }, () => ({
+    code: crypto.randomUUID(),
+    coupon_type: 'lifetime',
+    max_uses: 1,
+    notes: notes || (email ? `Sent to ${email}` : 'Admin generated'),
+  }));
+
+  const { data, error } = await admin
+    .from('coupon_codes')
+    .insert(rows)
+    .select('id, code, coupon_type, max_uses, times_used, is_active, notes, created_at');
+
+  if (error) {
+    return res.status(500).json({ success: false, error: error.message || 'Failed to create coupon' });
+  }
+
+  let emailResult = null;
+  if (sendEmail && email && data?.length) {
+    try {
+      const couponCode = data.length === 1 ? data[0].code : data.map((c) => c.code).join('\n');
+      const appUrl = env('APP_URL') || env('REACT_APP_APP_URL') || 'http://localhost:3000';
+      const { subject, html } = buildNotificationEmail('lifetime_coupon', {
+        couponCode,
+        notes,
+        signupUrl: appUrl,
+      });
+      if (!resend) {
+        emailResult = { skipped: true };
+      } else {
+        const result = await resend.emails.send({
+          from: emailFrom,
+          to: [email],
+          subject,
+          html,
+        });
+        if (result.error) throw new Error(result.error.message || 'Failed to send email');
+        emailResult = { id: result.data?.id };
+      }
+    } catch (err) {
+      return res.json({
+        success: true,
+        coupons: data,
+        emailSent: false,
+        emailError: err.message || 'Coupon created but email failed',
+      });
+    }
+  }
+
+  return res.json({
+    success: true,
+    coupons: data,
+    emailSent: Boolean(emailResult && !emailResult.skipped),
+    emailSkipped: Boolean(emailResult?.skipped),
+    emailId: emailResult?.id || null,
+  });
+});
+
+function escapeIlikeProfiles(value) {
+  return String(value).replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+}
+
+const PROFILE_UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function buildAdminProfilesQuery(admin, params) {
+  const q = (params.q || '').trim();
+  const status = params.status || 'all';
+  const country = (params.country || '').trim();
+  const sort = params.sort || 'created_desc';
+  const page = Math.max(1, parseInt(params.page, 10) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(params.limit, 10) || 50));
+  const offset = (page - 1) * limit;
+
+  let query = admin
+    .from('profiles')
+    .select(
+      'id, uuid, entity_name, description, email, city, country, active, user_id, created_at, updated_at, deactivated_at',
+      { count: 'exact' }
+    );
+
+  if (status === 'active') query = query.eq('active', true);
+  else if (status === 'archived') query = query.eq('active', false);
+
+  if (country) query = query.ilike('country', `%${escapeIlikeProfiles(country)}%`);
+
+  if (q) {
+    if (PROFILE_UUID_REGEX.test(q)) {
+      query = query.eq('uuid', q.toLowerCase());
+    } else {
+      const term = escapeIlikeProfiles(q);
+      query = query.or(
+        [
+          `entity_name.ilike.%${term}%`,
+          `email.ilike.%${term}%`,
+          `city.ilike.%${term}%`,
+          `country.ilike.%${term}%`,
+          `contact_person_name.ilike.%${term}%`,
+          `contact_person_email.ilike.%${term}%`,
+          `user_id.ilike.%${term}%`,
+          `description.ilike.%${term}%`,
+        ].join(',')
+      );
+    }
+  }
+
+  switch (sort) {
+    case 'name_asc':
+      query = query.order('entity_name', { ascending: true });
+      break;
+    case 'name_desc':
+      query = query.order('entity_name', { ascending: false });
+      break;
+    case 'created_asc':
+      query = query.order('created_at', { ascending: true });
+      break;
+    case 'updated_desc':
+      query = query.order('updated_at', { ascending: false });
+      break;
+    default:
+      query = query.order('created_at', { ascending: false });
+  }
+
+  query = query.range(offset, offset + limit - 1);
+  return { query, page, limit };
+}
+
+async function enrichProfilesWithOwnerEmail(admin, profiles) {
+  if (!profiles?.length) return profiles || [];
+  const userIds = [...new Set(profiles.map((p) => p.user_id).filter((id) => id && id !== 'anonymous'))];
+  const emailById = {};
+  await Promise.all(userIds.map(async (id) => {
+    try {
+      const { data } = await admin.auth.admin.getUserById(id);
+      if (data?.user?.email) emailById[id] = data.user.email;
+    } catch (_) {
+      /* ignore */
+    }
+  }));
+  return profiles.map((p) => ({
+    ...p,
+    owner_email: p.user_id && p.user_id !== 'anonymous' ? emailById[p.user_id] || null : null,
+  }));
+}
+
+/** GET/PATCH /api/admin-profiles — list/search/filter or archive/reactivate (admin only) */
+app.all('/api/admin-profiles', async (req, res) => {
+  if (req.method === 'OPTIONS') return res.status(200).end();
+
+  const auth = await requireAdminExpress(req);
+  if (auth.error) {
+    return res.status(auth.status).json({ success: false, error: auth.error });
+  }
+
+  const admin = getSupabaseAdmin();
+  if (!admin) {
+    return res.status(500).json({
+      success: false,
+      error: 'SUPABASE_SERVICE_ROLE_KEY is required to manage profiles',
+    });
+  }
+
+  if (req.method === 'GET') {
+    const { query, page, limit } = buildAdminProfilesQuery(admin, req.query || {});
+    const { data, error, count } = await query;
+    if (error) return res.status(500).json({ success: false, error: error.message });
+    const enriched = await enrichProfilesWithOwnerEmail(admin, data || []);
+    return res.json({
+      success: true,
+      profiles: enriched,
+      total: count ?? enriched.length,
+      page,
+      limit,
+    });
+  }
+
+  if (req.method === 'PATCH') {
+    const body = req.body || {};
+    const id = (body.id || '').trim();
+    if (!id) return res.status(400).json({ success: false, error: 'Profile id is required' });
+    if (typeof body.active !== 'boolean') {
+      return res.status(400).json({ success: false, error: 'active (boolean) is required' });
+    }
+
+    const now = new Date().toISOString();
+    const updatePayload = body.active
+      ? { active: true, reactivated_at: now, updated_at: now }
+      : { active: false, deactivated_at: now, updated_at: now };
+
+    const { data, error } = await admin
+      .from('profiles')
+      .update(updatePayload)
+      .eq('id', id)
+      .select('id, uuid, entity_name, active, updated_at')
+      .maybeSingle();
+
+    if (error) return res.status(500).json({ success: false, error: error.message });
+    if (!data) return res.status(404).json({ success: false, error: 'Profile not found' });
+    return res.json({ success: true, profile: data });
+  }
+
+  return res.status(405).json({ success: false, error: 'Method not allowed' });
+});
+
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
@@ -499,5 +812,5 @@ const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Square payment backend running on port ${PORT}`);
   console.log(`Environment: ${process.env.SQUARE_ENVIRONMENT || 'sandbox'}`);
-  console.log(`Endpoints: GET /api/config, POST /api/create-payment, /api/process-subscription, /api/process-payment`);
+  console.log(`Endpoints: GET /api/config, POST /api/create-payment, /api/process-subscription, /api/process-payment, GET/PATCH /api/admin-profiles, GET/POST /api/admin-coupons`);
 });

@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import './Home.css';
-import { FaHeart, FaQrcode, FaShareAlt, FaUsers, FaRocket, FaSignInAlt, FaList, FaPlus, FaChartBar, FaMousePointer, FaSignOutAlt, FaCrown } from 'react-icons/fa';
+import { FaHeart, FaQrcode, FaShareAlt, FaUsers, FaRocket, FaSignInAlt, FaList, FaPlus, FaChartBar, FaMousePointer, FaSignOutAlt, FaCrown, FaTicketAlt } from 'react-icons/fa';
 import { getTheme, applyTheme } from '../utils/theme';
 import { getEntityWithAnalytics } from '../utils/storage';
-function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProfile, onViewDashboard, onLogout, entities, onViewSubscription, subscriptionStatus }) {
+function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProfile, onViewDashboard, onLogout, entities, onViewSubscription, onAdminCoupons, onAdminProfiles, subscriptionStatus }) {
   const [summaryStats, setSummaryStats] = useState({ totalScans: 0, totalClicks: 0, totalProfiles: 0 });
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const isLoadingRef = useRef(false);
@@ -272,16 +272,16 @@ function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProf
                   <FaCrown /> Trial: {subscriptionStatus.trialDaysRemaining} day{subscriptionStatus.trialDaysRemaining !== 1 ? 's' : ''} remaining
                 </button>
               )}
-              {onViewSubscription && currentUser && subscriptionStatus?.isActive && (
+              {onViewSubscription && currentUser && (subscriptionStatus?.isActive || subscriptionStatus?.isLifetime) && (
                 <button 
                   onClick={onViewSubscription} 
                   className="cta-button"
                   style={{ backgroundColor: 'transparent', border: '2px solid currentColor' }}
                 >
-                  <FaCrown /> Manage subscription
+                  <FaCrown /> {subscriptionStatus?.isLifetime ? 'Lifetime Pro' : 'Manage subscription'}
                 </button>
               )}
-              {onViewSubscription && currentUser && subscriptionStatus?.hasSubscriptionRecord && !subscriptionStatus?.isActive && !subscriptionStatus?.trialActive && (
+              {onViewSubscription && currentUser && subscriptionStatus?.hasSubscriptionRecord && !subscriptionStatus?.isActive && !subscriptionStatus?.isLifetime && !subscriptionStatus?.trialActive && (
                 <button
                   onClick={onViewSubscription}
                   type="button"
@@ -302,6 +302,26 @@ function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProf
                   style={{ background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)', color: '#fff', border: 'none', boxShadow: '0 4px 14px rgba(185, 28, 28, 0.4)' }}
                 >
                   <FaCrown /> Upgrade Plan
+                </button>
+              )}
+              {onAdminProfiles && currentUser?.isAdmin && (
+                <button
+                  type="button"
+                  onClick={onAdminProfiles}
+                  className="cta-button"
+                  style={{ backgroundColor: 'transparent', border: '2px solid currentColor' }}
+                >
+                  <FaUsers /> All Profiles
+                </button>
+              )}
+              {onAdminCoupons && currentUser?.isAdmin && (
+                <button
+                  type="button"
+                  onClick={onAdminCoupons}
+                  className="cta-button"
+                  style={{ backgroundColor: 'transparent', border: '2px solid currentColor' }}
+                >
+                  <FaTicketAlt /> Coupons
                 </button>
               )}
             </div>
@@ -355,6 +375,30 @@ function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProf
                     : 'Create a profile first to view analytics and track performance.'}
                 </p>
               </div>
+
+              {onAdminProfiles && currentUser?.isAdmin && (
+                <div className="feature-card" style={{ cursor: 'pointer' }} onClick={onAdminProfiles}>
+                  <div className="feature-icon">
+                    <FaUsers />
+                  </div>
+                  <h3 className="feature-title">All Profiles</h3>
+                  <p className="feature-description">
+                    Search, filter, and manage every profile across all users.
+                  </p>
+                </div>
+              )}
+
+              {onAdminCoupons && currentUser?.isAdmin && (
+                <div className="feature-card" style={{ cursor: 'pointer' }} onClick={onAdminCoupons}>
+                  <div className="feature-icon">
+                    <FaTicketAlt />
+                  </div>
+                  <h3 className="feature-title">Lifetime Coupons</h3>
+                  <p className="feature-description">
+                    Generate UUID coupon codes and email them for free-for-life Pro access.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>

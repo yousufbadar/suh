@@ -48,8 +48,15 @@ async function createAdminUser() {
     const adminExists = existingUsers?.users?.find(u => u.email === adminEmail);
 
     if (adminExists) {
-      console.log('✅ Admin user already exists!');
+      console.log('✅ Admin user already exists — resetting password and admin role...');
+      const { error: updateError } = await supabase.auth.admin.updateUserById(adminExists.id, {
+        password: adminPassword,
+        email_confirm: true,
+        user_metadata: { username: 'admin', role: 'admin' },
+      });
+      if (updateError) throw updateError;
       console.log('User ID:', adminExists.id);
+      console.log('Password reset to:', adminPassword);
       return;
     }
 
