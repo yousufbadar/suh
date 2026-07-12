@@ -210,9 +210,77 @@ function SocialMediaIconsPage({ uuid }) {
   }
 
   const socialMediaLinks = sortSocialPlatformKeys(Object.keys(entity.socialMedia || {}));
-  const customLinks = entity.customLinks || [];
+  const customLinksWithIndex = (entity.customLinks || [])
+    .map((link, index) => ({ link, index }))
+    .filter(
+      ({ link }) => link?.link && typeof link.link === 'string' && link.link.trim() !== ''
+    );
+  const customLinksAboveSocial = Boolean(entity.customLinksAboveSocial);
 
-  if (socialMediaLinks.length === 0 && customLinks.length === 0) {
+  const renderSocialIcons = () => socialMediaLinks.map((platform) => {
+    const platformData = socialMediaPlatforms[platform];
+    if (!platformData) return null;
+
+    const Icon = platformData.icon;
+    const url = entity.socialMedia[platform];
+
+    if (!url || typeof url !== 'string' || url.trim() === '') {
+      return null;
+    }
+
+    return (
+      <button
+        key={platform}
+        onClick={(e) => handleSocialClick(e, platform, url, entity.id)}
+        className="social-icon-button"
+        style={{ color: platformData.color }}
+        title={platformData.name}
+        type="button"
+        aria-label={`Open ${platformData.name}`}
+      >
+        <Icon
+          className="social-icon-svg"
+          style={{ color: platformData.color }}
+        />
+      </button>
+    );
+  });
+
+  const renderCustomLinks = () => customLinksWithIndex.map(({ link: customLink, index }) => (
+    <button
+      key={`custom-${index}`}
+      onClick={(e) => handleCustomLinkClick(e, index, customLink.link, entity.id)}
+      className={`custom-link-button${customLink.showTextOnPage ? ' custom-link-button-with-text' : ''}`}
+      title={customLink.name}
+      type="button"
+      aria-label={`Open ${customLink.name}`}
+    >
+      <div className="custom-link-button-content">
+        {customLink.icon ? (
+          <img
+            src={customLink.icon}
+            alt={`${customLink.name} icon`}
+            className="custom-link-icon-image-page"
+          />
+        ) : (
+          <span className="custom-link-icon-placeholder">
+            {customLink.name?.charAt(0) || '?'}
+          </span>
+        )}
+        {customLink.showTextOnPage && customLink.name && (
+          <span className="custom-link-label">{customLink.name}</span>
+        )}
+      </div>
+    </button>
+  ));
+
+  const hasSocial = socialMediaLinks.some((platform) => {
+    const url = entity.socialMedia[platform];
+    return url && typeof url === 'string' && url.trim() !== '';
+  });
+  const hasCustom = customLinksWithIndex.length > 0;
+
+  if (!hasSocial && !hasCustom) {
     return (
       <>
         <SiteBanner compact />
@@ -238,71 +306,21 @@ function SocialMediaIconsPage({ uuid }) {
           )}
           <h1 className="company-name">{entity.entityName}</h1>
         </div>
-        <div className="social-icons-grid">
-          {socialMediaLinks.map((platform) => {
-            const platformData = socialMediaPlatforms[platform];
-            if (!platformData) return null;
-
-            const Icon = platformData.icon;
-            const url = entity.socialMedia[platform];
-
-            // Only render button if URL exists and is valid
-            if (!url || typeof url !== 'string' || url.trim() === '') {
-              return null;
-            }
-
-            return (
-              <button
-                key={platform}
-                onClick={(e) => handleSocialClick(e, platform, url, entity.id)}
-                className="social-icon-button"
-                style={{ color: platformData.color }}
-                title={platformData.name}
-                type="button"
-                aria-label={`Open ${platformData.name}`}
-              >
-                <Icon
-                  className="social-icon-svg"
-                  style={{ color: platformData.color }}
-                />
-              </button>
-            );
-          })}
-          {customLinks.map((customLink, index) => {
-            // Only render button if link exists and is valid
-            if (!customLink?.link || typeof customLink.link !== 'string' || customLink.link.trim() === '') {
-              return null;
-            }
-
-            return (
-              <button
-                key={`custom-${index}`}
-                onClick={(e) => handleCustomLinkClick(e, index, customLink.link, entity.id)}
-                className={`custom-link-button${customLink.showTextOnPage ? ' custom-link-button-with-text' : ''}`}
-                title={customLink.name}
-                type="button"
-                aria-label={`Open ${customLink.name}`}
-              >
-                <div className="custom-link-button-content">
-                  {customLink.icon ? (
-                    <img 
-                      src={customLink.icon} 
-                      alt={`${customLink.name} icon`}
-                      className="custom-link-icon-image-page"
-                    />
-                  ) : (
-                    <span className="custom-link-icon-placeholder">
-                      {customLink.name?.charAt(0) || '?'}
-                    </span>
-                  )}
-                  {customLink.showTextOnPage && customLink.name && (
-                    <span className="custom-link-label">{customLink.name}</span>
-                  )}
-                </div>
-              </button>
-            );
-          })}
-        </div>
+        {customLinksAboveSocial && hasCustom && (
+          <div className="social-icons-grid social-icons-grid-custom">
+            {renderCustomLinks()}
+          </div>
+        )}
+        {hasSocial && (
+          <div className={`social-icons-grid${customLinksAboveSocial && hasCustom ? ' social-icons-grid-below-custom' : ''}`}>
+            {renderSocialIcons()}
+          </div>
+        )}
+        {!customLinksAboveSocial && hasCustom && (
+          <div className={`social-icons-grid social-icons-grid-custom${hasSocial ? ' social-icons-grid-below-social' : ''}`}>
+            {renderCustomLinks()}
+          </div>
+        )}
         <a
           href="https://shareyourhearttoday.com/"
           target="_blank"

@@ -16,7 +16,7 @@ import SiteBanner from './components/SiteBanner';
 import Cart from './components/Cart';
 import Checkout from './components/Checkout';
 import { useCart } from './context/CartContext';
-import { getEntities, deactivateEntity, reactivateEntity, deleteEntity } from './utils/storage';
+import { getEntities, deactivateEntity, reactivateEntity, deleteEntity, countAnonymousProfiles } from './utils/storage';
 import { getTheme, applyTheme } from './utils/theme';
 import { supabase, isClientValid, testConnection } from './lib/supabase';
 import { getCurrentUser, logoutUser, clearUserCache, userFromAuthUser, cacheUserFromAuth } from './utils/auth';
@@ -83,6 +83,7 @@ function App() {
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [subscriptionStatus, setSubscriptionStatus] = useState(null);
   const currentUserRef = useRef(null);
+  const entitiesLoadIdRef = useRef(0);
   const isPaymentSuccessPopup = usePaymentSuccessPopup();
   const paymentSuccessHandledRef = useRef(false);
   const { count: cartCount } = useCart();
@@ -145,41 +146,40 @@ function App() {
   }, [currentTheme]);
 
   // Define loadEntities first so it can be used in other effects
-  const loadEntities = useCallback(async () => {
+  const loadEntities = useCallback(async (userIdOverride) => {
+    const loadId = ++entitiesLoadIdRef.current;
     try {
-      // Only load entities for the current user if logged in
-      const userId = currentUser?.id || null;
+      const userId = userIdOverride ?? currentUser?.id ?? null;
       console.log('📋 Loading entities for user:', userId || 'anonymous');
-      console.log('📋 Current user object:', currentUser);
       const loadedEntities = await getEntities(userId);
+      if (loadId !== entitiesLoadIdRef.current) {
+        console.log('ℹ️  Ignoring stale profile load result');
+        return;
+      }
       setEntities(loadedEntities);
       console.log(`✅ Loaded ${loadedEntities.length} profile(s)`);
-      
-      // Debug: If user is logged in but has no profiles, check if there are any profiles at all
+
       if (userId && loadedEntities.length === 0) {
-        console.warn('⚠️  User is logged in but has no profiles. Checking if any anonymous profiles exist...');
-        const allEntities = await getEntities(null);
-        console.log(`ℹ️  Total profiles in database: ${allEntities.length}`);
-        
-        // Check if there are anonymous profiles that should be migrated
-        const anonymousProfiles = allEntities.filter(e => e.userId === 'anonymous');
-        if (anonymousProfiles.length > 0) {
-          console.log(`🔄 Found ${anonymousProfiles.length} anonymous profile(s). Attempting to migrate...`);
+        const anonymousCount = await countAnonymousProfiles();
+        if (loadId !== entitiesLoadIdRef.current) return;
+
+        if (anonymousCount > 0) {
+          console.log(`🔄 Found ${anonymousCount} anonymous profile(s). Attempting to migrate...`);
           const { migrateAnonymousProfilesToUser } = await import('./utils/storage');
           const result = await migrateAnonymousProfilesToUser(userId);
+          if (loadId !== entitiesLoadIdRef.current) return;
+
           if (result.migrated > 0) {
             console.log(`✅ Migrated ${result.migrated} profile(s) to current user. Reloading...`);
-            // Reload entities after migration
             const reloadedEntities = await getEntities(userId);
+            if (loadId !== entitiesLoadIdRef.current) return;
             setEntities(reloadedEntities);
             console.log(`✅ Now showing ${reloadedEntities.length} profile(s)`);
-            return; // Exit early since we've already set entities
           }
-        } else {
-          console.log('ℹ️  No anonymous profiles found. User needs to create new profiles.');
         }
       }
     } catch (error) {
+      if (loadId !== entitiesLoadIdRef.current) return;
       console.error('❌ Error loading entities:', error);
       setEntities([]);
     }
@@ -284,6 +284,7 @@ function App() {
                     if (event === 'SIGNED_OUT' || event === 'USER_DELETED' || !session) {
                       console.log('🔄 Clearing user state due to logout');
                       currentUserRef.current = null;
+                      entitiesLoadIdRef.current += 1;
                       setCurrentUser(null);
                       setShowLogin(false);
                       setSubscriptionStatus(null);
@@ -379,8 +380,8 @@ function App() {
     if (currentUser) {
       const userId = currentUser.id;
       setTimeout(() => {
-        if (currentUserRef.current?.id !== userId) return; // signed out, avoid stale profile fetch
-        loadEntities().catch(error => {
+        if (currentUserRef.current?.id !== userId) return;
+        loadEntities(userId).catch(error => {
           if (currentUserRef.current?.id !== userId) return;
           console.error('Error loading entities:', error);
           setEntities([]);
@@ -475,7 +476,7 @@ function App() {
       cacheUserFromAuth(user);
 
       // Load entities asynchronously (don't block navigation)
-      loadEntities().catch(err => {
+      loadEntities(user.id).catch(err => {
         console.error('❌ Error loading entities after login:', err);
         // Don't throw - navigation should still work even if entities fail to load
       });
@@ -500,6 +501,7 @@ function App() {
       clearUserCache();
       // Clear user state first so no effect schedules profile fetches with old user id
       currentUserRef.current = null;
+      entitiesLoadIdRef.current += 1;
       setCurrentUser(null);
       setEntities([]);
       setSubscriptionStatus(null);
@@ -512,6 +514,7 @@ function App() {
     } catch (error) {
       console.error('❌ Logout error:', error);
       currentUserRef.current = null;
+      entitiesLoadIdRef.current += 1;
       setCurrentUser(null);
       setEntities([]);
       setSubscriptionStatus(null);

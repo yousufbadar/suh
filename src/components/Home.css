@@ -209,6 +209,20 @@
   background-clip: text;
 }
 
+/* Light sections: avoid white-start gradient (invisible on pale backgrounds) */
+.how-it-works-title,
+.features-title {
+  color: #1a1a2e;
+}
+
+.how-it-works-title .gradient-text,
+.features-title .gradient-text {
+  background: linear-gradient(135deg, #166534 0%, #32cd32 50%, #ca8a04 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
 .hero-subtitle {
   font-size: 1.6rem;
   margin-bottom: 40px;
@@ -468,13 +482,14 @@
   font-size: 3.5rem;
   margin-bottom: 20px;
   font-weight: 800;
-  text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.2);
+  color: #ffffff;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
 }
 
 .cta-text {
   font-size: 1.5rem;
   margin-bottom: 40px;
-  opacity: 0.98;
+  color: rgba(255, 255, 255, 0.98);
   font-weight: 500;
 }
 
@@ -484,7 +499,7 @@
   gap: 12px;
   padding: 25px 55px;
   background: white;
-  color: #ffd700;
+  color: #166534;
   border: 4px solid white;
   border-radius: 50px;
   font-size: 1.4rem;
@@ -494,6 +509,18 @@
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
   text-transform: uppercase;
   letter-spacing: 1.5px;
+}
+
+.cta-button-large.cta-button-outline {
+  background: transparent;
+  color: #ffffff;
+  border-color: #ffffff;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.2);
+}
+
+.cta-button-large.cta-button-outline:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
 }
 
 .cta-button-large:hover {
@@ -514,6 +541,14 @@
 .container {
   max-width: 1200px;
   margin: 0 auto;
+}
+
+/* Home sections sit on colored backgrounds — don't use App card styling */
+.home-page .container {
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 0;
 }
 
 @media (max-width: 768px) {

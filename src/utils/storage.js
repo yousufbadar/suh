@@ -36,6 +36,7 @@ const mapEntityFromDB = (dbEntity) => {
     socialMedia: dbEntity.social_media || {},
     logo: dbEntity.logo || null,
     customLinks: dbEntity.custom_links || [],
+    customLinksAboveSocial: Boolean(dbEntity.custom_links_above_social),
     active: dbEntity.active !== undefined ? dbEntity.active : true,
     userId: dbEntity.user_id || 'anonymous',
     createdAt: dbEntity.created_at || new Date().toISOString(),
@@ -64,6 +65,7 @@ const mapEntityToDB = (entity) => {
     social_media: entity.socialMedia || {},
     logo: entity.logo || null,
     custom_links: entity.customLinks || [],
+    custom_links_above_social: Boolean(entity.customLinksAboveSocial),
     active: entity.active !== undefined ? entity.active : true,
     user_id: entity.userId || 'anonymous',
   };
@@ -183,17 +185,26 @@ export const getEntities = async (userId = null) => {
       return [];
     }
 
-    // Build query - filter by user_id if provided
+    let effectiveUserId = userId;
+    if (!effectiveUserId) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user?.id) {
+        effectiveUserId = session.user.id;
+        console.warn('⚠️  getEntities called without userId while logged in — using session user');
+      }
+    }
+
+    // Build query - never return all profiles for regular list views
     let query = supabase
       .from('profiles')
       .select('*');
 
-    // Filter by user_id if userId is provided
-    if (userId) {
-      query = query.eq('user_id', userId);
-      console.log('🔍 Filtering profiles by user_id:', userId);
+    if (effectiveUserId) {
+      query = query.eq('user_id', effectiveUserId);
+      console.log('🔍 Filtering profiles by user_id:', effectiveUserId);
     } else {
-      console.log('ℹ️  No userId provided, fetching all profiles (this should only happen for anonymous users)');
+      query = query.eq('user_id', 'anonymous');
+      console.log('ℹ️  No user session — fetching anonymous profiles only');
     }
 
     query = query.order('created_at', { ascending: false });
@@ -211,15 +222,12 @@ export const getEntities = async (userId = null) => {
       throw error;
     }
 
-    const entities = data ? data.map(mapEntityFromDB) : [];
-    console.log(`✅ Retrieved ${entities.length} profile(s)${userId ? ` for user ${userId}` : ''}`);
-    
-    // Debug: Log first entity's user_id if any exist
-    if (entities.length > 0 && userId) {
-      console.log('🔍 Debug - First entity user_id:', entities[0].userId, 'vs current user:', userId);
-      console.log('🔍 Debug - Match:', entities[0].userId === userId);
+    let entities = data ? data.map(mapEntityFromDB) : [];
+    if (effectiveUserId) {
+      entities = entities.filter((entity) => entity.userId === effectiveUserId);
     }
-    
+    console.log(`✅ Retrieved ${entities.length} profile(s)${effectiveUserId ? ` for user ${effectiveUserId}` : ''}`);
+
     return entities;
   } catch (error) {
     console.error('❌ Error reading entities from database:', error);
@@ -229,6 +237,19 @@ export const getEntities = async (userId = null) => {
     }
     return [];
   }
+};
+
+export const countAnonymousProfiles = async () => {
+  if (!supabase?.from) return 0;
+  const { count, error } = await supabase
+    .from('profiles')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', 'anonymous');
+  if (error) {
+    console.warn('Could not count anonymous profiles:', error.message);
+    return 0;
+  }
+  return count || 0;
 };
 
 export const getEntityById = async (id, userId = null) => {

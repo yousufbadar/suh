@@ -118,6 +118,7 @@ function RegistrationForm({ entity, onSave, onCancel, currentUser, onLogout }) {
           socialMedia: socialMedia,
           logo: entity.logo || null,
           customLinks: normalizeCustomLinks(entity.customLinks),
+          customLinksAboveSocial: Boolean(entity.customLinksAboveSocial),
         };
     }
     return {
@@ -135,6 +136,7 @@ function RegistrationForm({ entity, onSave, onCancel, currentUser, onLogout }) {
       socialMedia: getInitialSocialMedia(),
       logo: null,
       customLinks: normalizeCustomLinks([]),
+      customLinksAboveSocial: false,
     };
   }, [entity]);
 
@@ -617,6 +619,7 @@ function RegistrationForm({ entity, onSave, onCancel, currentUser, onLogout }) {
         id: entity?.id, // Preserve ID if editing
         socialMedia: socialMediaToSave,
         customLinks: customLinksToSave,
+        customLinksAboveSocial: Boolean(sanitizedFormData.customLinksAboveSocial),
       };
 
       try {
@@ -932,6 +935,17 @@ function RegistrationForm({ entity, onSave, onCancel, currentUser, onLogout }) {
         <p className="section-description">
           Add custom links with your own name, icon image, and URL. Start with one link and add as many as you need.
         </p>
+        <label className="custom-link-checkbox custom-links-layout-option">
+          <input
+            type="checkbox"
+            checked={Boolean(formData.customLinksAboveSocial)}
+            onChange={(e) => setFormData((prev) => ({
+              ...prev,
+              customLinksAboveSocial: e.target.checked,
+            }))}
+          />
+          Display custom links above social media icons on the public page
+        </label>
         <div className="custom-links-container">
           {formData.customLinks.map((customLink, index) => (
             <div key={customLink.clientId} className="custom-link-item">

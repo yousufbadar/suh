@@ -236,7 +236,8 @@ export const sanitizeFormData = (formData) => {
     contactPersonPhone: formData.contactPersonPhone ? sanitizeText(formData.contactPersonPhone).trim() : '',
     socialMedia: {},
     logo: formData.logo || null,
-    customLinks: formData.customLinks || []
+    customLinks: formData.customLinks || [],
+    customLinksAboveSocial: Boolean(formData.customLinksAboveSocial),
   };
   
   // Sanitize social media URLs

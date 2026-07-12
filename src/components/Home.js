@@ -527,7 +527,7 @@ function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProf
               <FaRocket className="cta-rocket" />
             </button>
             {onLogin && (
-              <button onClick={onLogin} className="cta-button-large" style={{ backgroundColor: 'transparent', border: '2px solid currentColor' }}>
+              <button onClick={onLogin} className="cta-button-large cta-button-outline">
                 <FaSignInAlt /> Login
               </button>
             )}
