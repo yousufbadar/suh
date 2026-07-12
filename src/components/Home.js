@@ -3,7 +3,7 @@ import './Home.css';
 import { FaHeart, FaQrcode, FaShareAlt, FaUsers, FaRocket, FaSignInAlt, FaList, FaPlus, FaChartBar, FaMousePointer, FaSignOutAlt, FaCrown, FaTicketAlt } from 'react-icons/fa';
 import { getTheme, applyTheme } from '../utils/theme';
 import { getEntityWithAnalytics } from '../utils/storage';
-function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProfile, onViewDashboard, onLogout, entities, onViewSubscription, onAdminCoupons, onAdminProfiles, subscriptionStatus }) {
+function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProfile, onViewDashboard, onLogout, entities, onViewSubscription, onAdminCoupons, onAdminProfiles, onContact, subscriptionStatus }) {
   const [summaryStats, setSummaryStats] = useState({ totalScans: 0, totalClicks: 0, totalProfiles: 0 });
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const isLoadingRef = useRef(false);
@@ -193,18 +193,19 @@ function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProf
             
             {/* Summary Statistics */}
             {currentUser && (
-              <div style={{ 
+              <div className="hero-stats-panel" style={{ 
                 display: 'flex', 
-                gap: '2rem', 
+                gap: '1.25rem', 
                 justifyContent: 'center', 
                 flexWrap: 'wrap',
-                marginTop: '2rem',
-                padding: '1.5rem',
+                marginTop: '1rem',
+                marginBottom: '0.5rem',
+                padding: '1rem 1.25rem',
                 backgroundColor: 'rgba(255, 255, 255, 0.05)',
                 borderRadius: '12px',
                 backdropFilter: 'blur(10px)',
                 border: '1px solid rgba(255, 255, 255, 0.1)',
-                minHeight: '120px',
+                minHeight: '88px',
                 alignItems: 'center'
               }}>
                 {isLoadingStats ? (
@@ -241,7 +242,7 @@ function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProf
                 )}
               </div>
             )}
-            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <div className="hero-actions" style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap', marginTop: '0.75rem' }}>
               {onViewProfiles && (
                 <button onClick={onViewProfiles} className="cta-button">
                   <FaList /> View My Profiles
@@ -402,6 +403,14 @@ function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProf
             </div>
           </div>
         </div>
+
+        {onContact && (
+          <footer className="home-footer">
+            <button type="button" className="home-footer-link" onClick={onContact}>
+              Contact us
+            </button>
+          </footer>
+        )}
       </div>
     );
   }
@@ -428,7 +437,7 @@ function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProf
             <br />
             Connect with your crew across every platform, periodt.
           </p>
-          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+          <div className="hero-actions" style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap', marginTop: '0.5rem' }}>
             <button onClick={onGetStarted} className="cta-button">
               Let's Gooo! <FaRocket className="cta-rocket" />
             </button>
@@ -521,7 +530,7 @@ function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProf
         <div className="container">
           <h2 className="cta-title">Ready to level up your socials? 🔥</h2>
           <p className="cta-text">Let's get this bread and connect with your people</p>
-          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+          <div className="hero-actions" style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap' }}>
             <button onClick={onGetStarted} className="cta-button-large">
               Create Your Profile RN
               <FaRocket className="cta-rocket" />
@@ -534,6 +543,14 @@ function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProf
           </div>
         </div>
       </div>
+
+      {onContact && (
+        <footer className="home-footer">
+          <button type="button" className="home-footer-link" onClick={onContact}>
+            Contact us
+          </button>
+        </footer>
+      )}
     </div>
   );
 }

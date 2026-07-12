@@ -15,6 +15,7 @@ import AdminProfiles from './components/AdminProfiles';
 import SiteBanner from './components/SiteBanner';
 import Cart from './components/Cart';
 import Checkout from './components/Checkout';
+import ContactUs from './components/ContactUs';
 import { useCart } from './context/CartContext';
 import { getEntities, deactivateEntity, reactivateEntity, deleteEntity, countAnonymousProfiles } from './utils/storage';
 import { getTheme, applyTheme } from './utils/theme';
@@ -796,6 +797,18 @@ function App() {
     );
   }
 
+  if (currentPage === 'contact') {
+    return (
+      <div className="App">
+        <SiteBanner compact onLogoClick={() => setCurrentPage('home')} />
+        <ContactUs
+          currentUser={currentUser}
+          onBack={() => setCurrentPage('home')}
+        />
+      </div>
+    );
+  }
+
   // Render home page - public access (no authentication required)
   // Note: User session is preserved when navigating to home
   // Check home page FIRST before checking protected pages to ensure navigation works
@@ -855,6 +868,7 @@ function App() {
         onViewSubscription={handleViewSubscription}
         onAdminCoupons={currentUser?.isAdmin ? handleAdminCoupons : undefined}
         onAdminProfiles={currentUser?.isAdmin ? handleAdminProfiles : undefined}
+        onContact={() => setCurrentPage('contact')}
         onLogout={handleLogout}
         entities={entities}
         subscriptionStatus={subscriptionStatus}
@@ -944,6 +958,13 @@ function App() {
             title="Cart"
           >
             Cart {cartCount > 0 && <span className="nav-cart-badge">{cartCount}</span>}
+          </button>
+          <button
+            type="button"
+            onClick={() => setCurrentPage('contact')}
+            className={`nav-button ${currentPage === 'contact' ? 'active' : ''}`}
+          >
+            Contact
           </button>
           {currentUser?.isAdmin && (
             <>

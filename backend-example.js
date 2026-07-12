@@ -16,6 +16,7 @@
  *   GET  /api/config           → { applicationId, locationId, sandbox } for Web SDK
  *   POST /api/create-payment   → body: { sourceId, amount (cents string), idempotencyKey }
  *   POST /api/send-notification → body: { to, type, data } — customer emails (payment, trial, subscription, weekly summary)
+ *   POST /api/contact           → body: { name, email, subject, message } — contact form
  *   POST /api/process-subscription, POST /api/process-payment (legacy)
  */
 
@@ -65,7 +66,14 @@ const locationId = env('SQUARE_LOCATION_ID') || null;
 const sandbox = env('SQUARE_ENVIRONMENT') !== 'production';
 
 let squareClient = null;
-if (token) {
+let squareInitAttempted = false;
+
+function getSquareClient() {
+  if (squareClient || squareInitAttempted) return squareClient;
+  squareInitAttempted = true;
+
+  if (!token) return null;
+
   try {
     const { SquareClient, SquareEnvironment } = require('square');
     squareClient = new SquareClient({
@@ -84,9 +92,8 @@ if (token) {
       console.warn('Square (squareup) fallback failed:', e2?.message || e2);
     }
   }
-}
-if (!squareClient && token) {
-  console.warn('Square client is null but token is set — check SDK (npm install square)');
+
+  return squareClient;
 }
 
 // Startup log: confirm env values are picked up (no secrets printed)
@@ -94,7 +101,7 @@ console.log('[Square config] SQUARE_ACCESS_TOKEN:', token ? `set (${token.length
 console.log('[Square config] SQUARE_APPLICATION_ID:', applicationId ? `set (${applicationId.substring(0, 12)}...)` : 'MISSING');
 console.log('[Square config] SQUARE_LOCATION_ID:', locationId || 'MISSING');
 console.log('[Square config] SQUARE_ENVIRONMENT / sandbox:', sandbox ? 'sandbox' : 'production');
-console.log('[Square config] Square client:', squareClient ? 'initialized' : 'NOT initialized');
+console.log('[Square config] Square client: lazy initialization enabled');
 console.log('[Email] Resend:', resend ? 'configured' : 'not configured (set RESEND_API_KEY to send emails)');
 
 const app = express();
@@ -145,7 +152,8 @@ app.post('/api/create-payment', async (req, res) => {
     });
   }
 
-  if (!squareClient) {
+  const client = getSquareClient();
+  if (!client) {
     console.log('[create-payment] rejected: squareClient is null');
     return res.status(500).json({
       success: false,
@@ -213,10 +221,11 @@ app.post('/api/create-payment', async (req, res) => {
 });
 
 function createPayment(body) {
-  if (squareClient.payments && typeof squareClient.payments.create === 'function') {
-    return squareClient.payments.create(body);
+  const client = getSquareClient();
+  if (client.payments && typeof client.payments.create === 'function') {
+    return client.payments.create(body);
   }
-  return squareClient.paymentsApi.createPayment({
+  return client.paymentsApi.createPayment({
     body: {
       sourceId: body.sourceId,
       idempotencyKey: body.idempotencyKey,
@@ -260,7 +269,8 @@ app.post('/api/process-subscription', async (req, res) => {
     return res.json({ success: true, isTrialStart: true });
   }
 
-  if (!squareClient) {
+  const client = getSquareClient();
+  if (!client) {
     return res.status(500).json({
       success: false,
       error: 'Square is not configured. Set SQUARE_ACCESS_TOKEN in .env',
@@ -360,7 +370,8 @@ app.post('/api/process-payment', async (req, res) => {
     });
   }
 
-  if (!squareClient) {
+  const client = getSquareClient();
+  if (!client) {
     return res.status(500).json({
       success: false,
       error: 'Square is not configured. Set SQUARE_ACCESS_TOKEN in .env',
@@ -477,6 +488,12 @@ app.post('/api/send-notification', async (req, res) => {
     console.error('[send-notification] Error:', err);
     return res.status(500).json({ success: false, error: err.message || 'Failed to send email' });
   }
+});
+
+/** POST /api/contact — contact form submission */
+app.post('/api/contact', async (req, res) => {
+  const contactHandler = require('./api/contact.js');
+  return contactHandler(req, res);
 });
 
 /** Admin coupon helpers (shared with Vercel api/admin-coupons.js patterns) */

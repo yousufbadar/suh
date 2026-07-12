@@ -1,6 +1,6 @@
 /**
  * Build subject and HTML for notification emails.
- * Types: payment_receipt, subscription_activated, trial_started, subscription_cancelled, trial_ending_reminder, weekly_dashboard_summary, lifetime_coupon
+ * Types: payment_receipt, subscription_activated, trial_started, subscription_cancelled, trial_ending_reminder, weekly_dashboard_summary, lifetime_coupon, contact_form
  */
 function buildNotificationEmail(type, data = {}) {
   const siteName = data.siteName || 'Share Your Heart Today';
@@ -72,6 +72,23 @@ function buildNotificationEmail(type, data = {}) {
           `<ol style="padding-left:20px;">${codesHtml}</ol>` +
           `<p>On the sign-up form, paste the code into the <strong>Coupon Code</strong> field.</p>` +
           `<p><a href="${data.signupUrl || '#'}" class="btn">Create your account</a></p>`
+        ),
+      };
+    }
+    case 'contact_form': {
+      const safeName = String(data.name || '').replace(/</g, '&lt;');
+      const safeEmail = String(data.email || '').replace(/</g, '&lt;');
+      const safeSubject = String(data.subject || '').replace(/</g, '&lt;');
+      const safeMessage = String(data.message || '')
+        .replace(/</g, '&lt;')
+        .replace(/\n/g, '<br>');
+      return {
+        subject: `Contact: ${safeSubject}`,
+        html: baseHtml(
+          `<h2>New contact message</h2>` +
+          `<p><strong>From:</strong> ${safeName}<br><strong>Email:</strong> ${safeEmail}</p>` +
+          `<p><strong>Subject:</strong> ${safeSubject}</p>` +
+          `<p>${safeMessage}</p>`
         ),
       };
     }
