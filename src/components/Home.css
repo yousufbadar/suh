@@ -368,92 +368,444 @@
 }
 
 .how-it-works {
-  padding: 48px 20px;
-  background: linear-gradient(135deg, #fff5f7 0%, #f0f9ff 100%);
+  padding: 56px 20px 64px;
+  background:
+    radial-gradient(ellipse 80% 50% at 10% 20%, rgba(255, 215, 0, 0.18) 0%, transparent 55%),
+    radial-gradient(ellipse 70% 45% at 90% 80%, rgba(50, 205, 50, 0.16) 0%, transparent 50%),
+    linear-gradient(165deg, #fff8eb 0%, #f3fff5 45%, #fff0f5 100%);
   position: relative;
+  overflow: hidden;
 }
 
 .how-it-works-title {
   text-align: center;
   font-size: 2.25rem;
-  margin-bottom: 28px;
+  margin-bottom: 8px;
   font-weight: 800;
 }
 
-.steps {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 16px;
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-.step {
-  flex: 1;
-  min-width: 250px;
-  max-width: 300px;
+.how-it-works-lead {
   text-align: center;
-  padding: 12px;
+  max-width: 480px;
+  margin: 0 auto 40px;
+  font-size: 1.1rem;
+  color: #3d4a5c;
+  line-height: 1.5;
 }
 
-.step-number {
-  width: 70px;
-  height: 70px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #ffd700 0%, #32cd32 50%, #28a745 100%);
-  color: white;
-  font-size: 2rem;
-  font-weight: 800;
+.journey {
+  max-width: 920px;
+  margin: 0 auto;
   display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.journey-step {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem 2.5rem;
   align-items: center;
+  padding: 1.25rem 0;
+}
+
+.journey-step--flip .journey-visual {
+  order: 2;
+}
+
+.journey-step--flip .journey-copy {
+  order: 1;
+  text-align: right;
+}
+
+.journey-step--flip .journey-badge {
+  margin-left: auto;
+}
+
+.journey-connector {
+  display: flex;
   justify-content: center;
-  margin: 0 auto 20px;
-  box-shadow: 0 8px 25px rgba(255, 215, 0, 0.3);
-  border: 4px solid white;
-  animation: pulse 2s ease-in-out infinite;
+  padding: 0.15rem 0;
 }
 
-@keyframes pulse {
-  0%, 100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.1);
-  }
+.journey-heart {
+  color: #e4405f;
+  font-size: 1.1rem;
+  animation: journeyPulse 2.2s ease-in-out infinite;
+  filter: drop-shadow(0 2px 6px rgba(228, 64, 95, 0.35));
 }
 
-.step h3 {
-  font-size: 1.5rem;
+@keyframes journeyPulse {
+  0%, 100% { transform: scale(1); opacity: 0.85; }
+  50% { transform: scale(1.25); opacity: 1; }
+}
+
+.journey-badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #166534;
+  background: rgba(50, 205, 50, 0.15);
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  margin-bottom: 0.65rem;
+}
+
+.journey-copy h3 {
+  font-size: clamp(1.35rem, 3vw, 1.75rem);
   color: #1a1a2e;
-  margin-bottom: 10px;
-  font-weight: 700;
+  margin: 0 0 0.5rem;
+  font-weight: 800;
+  line-height: 1.2;
 }
 
-.step p {
+.journey-copy p {
+  margin: 0;
   font-size: 1.05rem;
   color: #4a5568;
-  line-height: 1.7;
+  line-height: 1.65;
 }
 
-.step-arrow {
-  font-size: 2.5rem;
+.journey-visual {
+  display: flex;
+  justify-content: center;
+  animation: journeyFloat 5s ease-in-out infinite;
+}
+
+.journey-step:nth-child(3) .journey-visual {
+  animation-delay: 0.4s;
+}
+
+.journey-step:nth-child(5) .journey-visual {
+  animation-delay: 0.8s;
+}
+
+.journey-step:nth-child(7) .journey-visual {
+  animation-delay: 1.2s;
+}
+
+@keyframes journeyFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+/* —— Mock UI panels —— */
+.mock-panel {
+  width: 100%;
+  max-width: 260px;
+  background: #fff;
+  border-radius: 16px;
+  border: 2px solid rgba(26, 26, 46, 0.08);
+  overflow: hidden;
+  box-shadow:
+    0 18px 40px rgba(22, 101, 52, 0.12),
+    0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.mock-panel-bar {
+  display: flex;
+  gap: 6px;
+  padding: 10px 12px;
+  background: linear-gradient(90deg, #ffd700 0%, #32cd32 55%, #28a745 100%);
+}
+
+.mock-panel-bar span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.mock-panel-body {
+  padding: 16px 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.mock-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #e4405f, #ff6b9d);
+  margin-bottom: 4px;
+}
+
+.mock-line {
+  height: 8px;
+  border-radius: 4px;
+  background: #e8edf2;
+}
+
+.mock-line--wide { width: 78%; }
+.mock-line--mid { width: 55%; }
+.mock-line--short { width: 36%; margin-top: 6px; }
+.mock-line--center { margin-left: auto; margin-right: auto; }
+
+.mock-field {
+  width: 100%;
+  height: 28px;
+  border-radius: 8px;
+  background: #f4f7fa;
+  border: 1px solid #e2e8f0;
+}
+
+.mock-field--link {
+  background: linear-gradient(90deg, #f4f7fa 60%, rgba(50, 205, 50, 0.2));
+}
+
+.mock-btn {
+  width: 100%;
+  text-align: center;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.mock-btn--google {
+  background: #fff;
+  border: 1.5px solid #dadce0;
+  color: #3c4043;
+}
+
+.mock-btn--primary {
   background: linear-gradient(135deg, #ffd700 0%, #32cd32 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  font-weight: bold;
-  animation: bounce 2s ease-in-out infinite;
+  color: #fff;
+  border: none;
+  margin-top: 2px;
 }
 
-@keyframes bounce {
-  0%, 100% {
-    transform: translateX(0);
-  }
-  50% {
-    transform: translateX(10px);
-  }
+.mock-divider {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #94a3b8;
+  font-size: 0.65rem;
+  font-weight: 600;
+}
+
+.mock-divider::before,
+.mock-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #e2e8f0;
+}
+
+.mock-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.mock-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #ffd700, #32cd32);
+}
+
+.mock-social-row {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+  justify-content: center;
+  margin: 4px 0 6px;
+}
+
+.mock-social {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: block;
+}
+
+.mock-social.ig { background: linear-gradient(45deg, #f09433, #e4405f, #bc1888); }
+.mock-social.fb { background: #1877f2; }
+.mock-social.yt { background: #ff0000; }
+.mock-social.tk { background: #010101; }
+.mock-social.li { background: #0a66c2; }
+
+/* —— QR stage —— */
+.mock-qr-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 20px 16px;
+  background: #fff;
+  border-radius: 20px;
+  border: 2px solid rgba(26, 26, 46, 0.08);
+  box-shadow:
+    0 18px 40px rgba(228, 64, 95, 0.1),
+    0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.mock-qr {
+  position: relative;
+  width: 148px;
+  height: 148px;
+  padding: 10px;
+  background: #fff;
+  border-radius: 12px;
+  border: 2px solid #1a1a2e;
+}
+
+.mock-qr-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  grid-template-rows: repeat(7, 1fr);
+  gap: 3px;
+  width: 100%;
+  height: 100%;
+}
+
+.mock-qr-cell {
+  background: transparent;
+  border-radius: 1px;
+}
+
+.mock-qr-cell.on {
+  background: #1a1a2e;
+}
+
+.mock-qr-heart {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.mock-qr-heart svg {
+  font-size: 1.75rem;
+  color: #e4405f;
+  filter: drop-shadow(0 0 0 4px #fff);
+  background: #fff;
+  border-radius: 50%;
+  padding: 6px;
+  animation: journeyPulse 2s ease-in-out infinite;
+}
+
+.mock-qr-link {
+  font-family: ui-monospace, monospace;
+  font-size: 0.68rem;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 4px 10px;
+  border-radius: 6px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mock-qr-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.mock-qr-actions span {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #166534;
+  background: rgba(50, 205, 50, 0.12);
+  padding: 5px 10px;
+  border-radius: 999px;
+}
+
+/* —— Phone scan —— */
+.journey-visual--scan {
+  position: relative;
+  align-items: center;
+}
+
+.mock-phone {
+  width: 140px;
+  height: 260px;
+  background: #1a1a2e;
+  border-radius: 28px;
+  padding: 10px 8px 12px;
+  position: relative;
+  z-index: 1;
+  box-shadow:
+    0 22px 44px rgba(26, 26, 46, 0.28),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.08);
+}
+
+.mock-phone-notch {
+  width: 48px;
+  height: 6px;
+  background: #0d0d1a;
+  border-radius: 4px;
+  margin: 0 auto 8px;
+}
+
+.mock-phone-screen {
+  height: calc(100% - 14px);
+  background: linear-gradient(180deg, #fff8eb 0%, #e8fff0 100%);
+  border-radius: 20px;
+  padding: 20px 12px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+  overflow: hidden;
+}
+
+.mock-phone-logo {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ffd700, #32cd32);
+  box-shadow: 0 4px 14px rgba(50, 205, 50, 0.35);
+}
+
+.mock-social-row--phone {
+  margin-top: 8px;
+}
+
+.mock-scan-beam {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #32cd32, #ffd700, transparent);
+  animation: scanBeam 2.4s ease-in-out infinite;
+  opacity: 0.85;
+}
+
+@keyframes scanBeam {
+  0% { top: 12%; opacity: 0; }
+  20% { opacity: 0.9; }
+  80% { opacity: 0.9; }
+  100% { top: 88%; opacity: 0; }
+}
+
+.mock-scan-pulse {
+  position: absolute;
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  border: 2px solid rgba(50, 205, 50, 0.35);
+  animation: scanRing 2.8s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes scanRing {
+  0% { transform: scale(0.6); opacity: 0.7; }
+  100% { transform: scale(1.35); opacity: 0; }
 }
 
 .cta-section {
@@ -600,13 +952,26 @@
     font-size: 2rem;
   }
 
-  .steps {
-    flex-direction: column;
+  .journey-step,
+  .journey-step--flip {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+    text-align: center;
   }
 
-  .step-arrow {
-    transform: rotate(90deg);
-    margin: 10px 0;
+  .journey-step--flip .journey-visual,
+  .journey-step--flip .journey-copy {
+    order: unset;
+    text-align: center;
+  }
+
+  .journey-step--flip .journey-badge {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .journey-visual {
+    order: -1;
   }
 
   .features-grid {

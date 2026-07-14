@@ -3,6 +3,11 @@ import './Home.css';
 import { FaHeart, FaQrcode, FaShareAlt, FaUsers, FaRocket, FaSignInAlt, FaList, FaPlus, FaChartBar, FaMousePointer, FaSignOutAlt, FaCrown, FaTicketAlt } from 'react-icons/fa';
 import { getTheme, applyTheme } from '../utils/theme';
 import { getEntityWithAnalytics } from '../utils/storage';
+
+const QR_PREVIEW_CELLS = Array.from({ length: 49 }, (_, i) =>
+  [0, 1, 2, 6, 7, 8, 14, 42, 43, 44, 48, 21, 24, 27, 28, 10, 12, 16, 18, 30, 32, 36, 38].includes(i)
+);
+
 function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProfile, onViewDashboard, onLogout, entities, onViewSubscription, onAdminCoupons, onAdminProfiles, onContact, subscriptionStatus }) {
   const [summaryStats, setSummaryStats] = useState({ totalScans: 0, totalClicks: 0, totalProfiles: 0 });
   const [isLoadingStats, setIsLoadingStats] = useState(false);
@@ -453,26 +458,151 @@ function Home({ onGetStarted, onLogin, currentUser, onViewProfiles, onCreateProf
       <div className="how-it-works">
         <div className="container">
           <h2 className="how-it-works-title">
-            <span className="gradient-text">How it works</span> (it's easy, fr) 📖
+            <span className="gradient-text">How it works</span>
           </h2>
-          <div className="steps">
-            <div className="step">
-              <div className="step-number">1</div>
-              <h3>Set Up Your Profile 🎨</h3>
-              <p>Add your brand name, logo, and drop all your social links. Takes like 2 mins, no cap.</p>
+          <p className="how-it-works-lead">
+            From signup to a scannable QR — your whole vibe in four beats.
+          </p>
+
+          <div className="journey">
+            {/* Step 1 — Register */}
+            <article className="journey-step">
+              <div className="journey-visual journey-visual--register" aria-hidden="true">
+                <div className="mock-panel">
+                  <div className="mock-panel-bar">
+                    <span /><span /><span />
+                  </div>
+                  <div className="mock-panel-body">
+                    <div className="mock-avatar" />
+                    <div className="mock-line mock-line--wide" />
+                    <div className="mock-line mock-line--mid" />
+                    <div className="mock-btn mock-btn--google">Google</div>
+                    <div className="mock-divider"><span>or</span></div>
+                    <div className="mock-field" />
+                    <div className="mock-field" />
+                    <div className="mock-btn mock-btn--primary">Create Account</div>
+                  </div>
+                </div>
+              </div>
+              <div className="journey-copy">
+                <span className="journey-badge">01 · Register</span>
+                <h3>Create your account</h3>
+                <p>
+                  Sign up with email or Google in one tap. Optional coupon unlocks
+                  Lifetime Pro — otherwise you start on a free trial.
+                </p>
+              </div>
+            </article>
+
+            <div className="journey-connector" aria-hidden="true">
+              <FaHeart className="journey-heart" />
             </div>
-            <div className="step-arrow">✨</div>
-            <div className="step">
-              <div className="step-number">2</div>
-              <h3>Get Your QR Code 📸</h3>
-              <p>Download your personalized QR with a heart in the middle. It's giving ✨aesthetic✨</p>
+
+            {/* Step 2 — Use / build profile */}
+            <article className="journey-step journey-step--flip">
+              <div className="journey-visual journey-visual--build" aria-hidden="true">
+                <div className="mock-panel mock-panel--form">
+                  <div className="mock-panel-bar">
+                    <span /><span /><span />
+                  </div>
+                  <div className="mock-panel-body">
+                    <div className="mock-brand-row">
+                      <div className="mock-logo" />
+                      <div>
+                        <div className="mock-line mock-line--mid" />
+                        <div className="mock-line mock-line--short" />
+                      </div>
+                    </div>
+                    <div className="mock-social-row">
+                      <span className="mock-social ig" />
+                      <span className="mock-social fb" />
+                      <span className="mock-social yt" />
+                      <span className="mock-social tk" />
+                      <span className="mock-social li" />
+                    </div>
+                    <div className="mock-field" />
+                    <div className="mock-field mock-field--link" />
+                    <div className="mock-btn mock-btn--primary">Save Profile</div>
+                  </div>
+                </div>
+              </div>
+              <div className="journey-copy">
+                <span className="journey-badge">02 · Build</span>
+                <h3>Craft your link hub</h3>
+                <p>
+                  Add your brand, logo, and every social you vibe with — plus custom
+                  links with your own icons. One profile, all your platforms.
+                </p>
+              </div>
+            </article>
+
+            <div className="journey-connector" aria-hidden="true">
+              <FaHeart className="journey-heart" />
             </div>
-            <div className="step-arrow">✨</div>
-            <div className="step">
-              <div className="step-number">3</div>
-              <h3>Share & Watch It Pop Off 🚀</h3>
-              <p>Drop it anywhere and watch people connect with all your socials. That's it. You're done.</p>
+
+            {/* Step 3 — QR result */}
+            <article className="journey-step">
+              <div className="journey-visual journey-visual--qr" aria-hidden="true">
+                <div className="mock-qr-stage">
+                  <div className="mock-qr">
+                    <div className="mock-qr-grid">
+                      {QR_PREVIEW_CELLS.map((on, i) => (
+                        <span key={i} className={`mock-qr-cell${on ? ' on' : ''}`} />
+                      ))}
+                    </div>
+                    <div className="mock-qr-heart">
+                      <FaHeart />
+                    </div>
+                  </div>
+                  <div className="mock-qr-link">yoursite.com/?uuid=…</div>
+                  <div className="mock-qr-actions">
+                    <span>Copy link</span>
+                    <span>Download QR</span>
+                  </div>
+                </div>
+              </div>
+              <div className="journey-copy">
+                <span className="journey-badge">03 · Your QR</span>
+                <h3>Get your heart QR</h3>
+                <p>
+                  Every profile gets a unique QR and shareable link. Download the PNG
+                  with the signature heart center — ready for print, stickers, or stories.
+                </p>
+              </div>
+            </article>
+
+            <div className="journey-connector" aria-hidden="true">
+              <FaHeart className="journey-heart" />
             </div>
+
+            {/* Step 4 — Visitors scan */}
+            <article className="journey-step journey-step--flip">
+              <div className="journey-visual journey-visual--scan" aria-hidden="true">
+                <div className="mock-phone">
+                  <div className="mock-phone-notch" />
+                  <div className="mock-phone-screen">
+                    <div className="mock-phone-logo" />
+                    <div className="mock-line mock-line--mid mock-line--center" />
+                    <div className="mock-social-row mock-social-row--phone">
+                      <span className="mock-social ig" />
+                      <span className="mock-social fb" />
+                      <span className="mock-social yt" />
+                      <span className="mock-social tk" />
+                    </div>
+                    <div className="mock-scan-beam" />
+                  </div>
+                </div>
+                <div className="mock-scan-pulse" />
+              </div>
+              <div className="journey-copy">
+                <span className="journey-badge">04 · Share</span>
+                <h3>They scan. You connect.</h3>
+                <p>
+                  Friends open your public page — logo, name, and icons. One tap lands
+                  them on Instagram, TikTok, your menu, whatever you set. You see the scans.
+                </p>
+              </div>
+            </article>
           </div>
         </div>
       </div>
