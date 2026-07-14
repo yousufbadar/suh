@@ -120,43 +120,81 @@ function EntityView({ entity, onBack, onEdit, onDelete, onPermanentDelete, onVie
   };
 
   const handleDownloadQR = () => {
-    // Find the QR code SVG element
-    const qrCodeSvg = document.querySelector('.qr-code-container svg');
+    // Find the QR code SVG element (heart overlay is HTML — composite it onto the PNG)
+    const qrCodeSvg = document.querySelector('.qr-code-wrapper svg')
+      || document.querySelector('.qr-code-container svg');
     if (!qrCodeSvg) return;
 
-    // Get SVG data
     const svgData = new XMLSerializer().serializeToString(qrCodeSvg);
     const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
     const url = URL.createObjectURL(svgBlob);
 
-    // Convert SVG to PNG using canvas
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
-      
-      // Set canvas dimensions (higher resolution for better quality)
-      canvas.width = img.width * 2;
-      canvas.height = img.height * 2;
-      
-      // Draw image on canvas
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      
-      // Convert to PNG and download
+      if (!ctx) {
+        URL.revokeObjectURL(url);
+        return;
+      }
+
+      // Higher resolution for print-quality download
+      const scale = 2;
+      const size = Math.max(img.width, img.height) * scale;
+      canvas.width = size;
+      canvas.height = size;
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, size, size);
+      ctx.drawImage(img, 0, 0, size, size);
+
+      // Match on-screen heart: 60px disk + ~32px icon on a 360px QR
+      const diskR = size * (30 / 360);
+      const cx = size / 2;
+      const cy = size / 2;
+
+      ctx.save();
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.15)';
+      ctx.shadowBlur = 8 * scale;
+      ctx.beginPath();
+      ctx.arc(cx, cy, diskR, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+      ctx.restore();
+
+      // Heart centered in the white disk (path origin = visual center)
+      const heartSize = size * (68 / 360);
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.scale(heartSize / 100, heartSize / 100);
+      ctx.beginPath();
+      // Tip bottom, lobes top — balanced around (0, 0)
+      ctx.moveTo(0, 36);
+      ctx.bezierCurveTo(-48, 8, -48, -32, -22, -32);
+      ctx.bezierCurveTo(-10, -32, -4, -24, 0, -14);
+      ctx.bezierCurveTo(4, -24, 10, -32, 22, -32);
+      ctx.bezierCurveTo(48, -32, 48, 8, 0, 36);
+      ctx.closePath();
+      ctx.fillStyle = '#e4405f';
+      ctx.fill();
+      ctx.restore();
+
       canvas.toBlob((blob) => {
+        if (!blob) return;
         const downloadUrl = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = downloadUrl;
-                      link.download = `${currentEntity.entityName.replace(/\s+/g, '_')}_QR_Code.png`;
+        link.download = `${currentEntity.entityName.replace(/\s+/g, '_')}_QR_Code.png`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(downloadUrl);
       }, 'image/png');
-      
+
       URL.revokeObjectURL(url);
     };
-    
+
+    img.onerror = () => URL.revokeObjectURL(url);
     img.src = url;
   };
 
