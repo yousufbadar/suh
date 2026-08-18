@@ -1,4 +1,5 @@
 // Security utilities for input validation and sanitization
+import { sanitizeCustomLinkIcon } from './nonprofitIcons';
 
 /**
  * Sanitize input to prevent XSS attacks
@@ -257,7 +258,7 @@ export const sanitizeFormData = (formData) => {
   if (formData.customLinks && Array.isArray(formData.customLinks)) {
     sanitized.customLinks = formData.customLinks.map((link) => ({
       name: link.name ? sanitizeText(link.name).trim() : '',
-      icon: link.icon || null,
+      icon: sanitizeCustomLinkIcon(link.icon),
       link: link.link ? sanitizeUrl(link.link) : '',
       showTextOnPage: Boolean(link.showTextOnPage),
     }));

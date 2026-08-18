@@ -557,6 +557,91 @@
   cursor: pointer;
 }
 
+.icon-picker-hint {
+  margin: 0 0 10px;
+  color: #666;
+  font-size: 0.85rem;
+}
+
+.nonprofit-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.nonprofit-icon-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 78px;
+  padding: 8px 6px;
+  border: 2px solid #e8e8e8;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  color: #333;
+  transition: all 0.2s ease;
+}
+
+.nonprofit-icon-option svg {
+  font-size: 1.45rem;
+}
+
+.nonprofit-icon-option span {
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  color: #555;
+}
+
+.nonprofit-icon-option:hover {
+  border-color: #32cd32;
+  background: #f9fff9;
+  transform: translateY(-1px);
+}
+
+.nonprofit-icon-option.selected {
+  border-color: #28a745;
+  background: #eefbee;
+  box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.18);
+}
+
+.nonprofit-icon-option.selected span {
+  color: #1a5c1a;
+}
+
+.icon-upload-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.icon-upload-label-compact {
+  flex: 1;
+  min-width: 160px;
+  padding: 12px 16px !important;
+  flex-direction: row !important;
+}
+
+.clear-icon-button {
+  border: none;
+  background: transparent;
+  color: #c0392b;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 4px;
+}
+
+.clear-icon-button:hover {
+  text-decoration: underline;
+}
+
 /* Icon Upload Styles */
 .icon-upload-container {
   display: flex;
@@ -607,13 +692,13 @@
 }
 
 .icon-preview {
-  width: 100%;
-  height: auto;
-  max-height: 80px;
+  width: 64px;
+  height: 64px;
   object-fit: contain;
   border-radius: 8px;
   border: 2px solid #e0e0e0;
   background: white;
+  display: block;
 }
 
 .remove-icon-button {
@@ -643,6 +728,10 @@
 @media (max-width: 768px) {
   .custom-link-fields {
     grid-template-columns: 1fr;
+  }
+
+  .nonprofit-icon-grid {
+    grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
   }
 }
 

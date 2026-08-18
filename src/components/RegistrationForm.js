@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import './RegistrationForm.css';
 import { saveEntity } from '../utils/storage';
+import { loadProfileDraft, saveProfileDraft, clearProfileDraft } from '../utils/profileDraft';
 import {
   sanitizeText,
   sanitizeUrl,
@@ -39,6 +40,12 @@ import {
   FaTrash,
 } from 'react-icons/fa';
 import { SiGooglemaps } from 'react-icons/si';
+import CustomLinkIcon from './CustomLinkIcon';
+import {
+  NONPROFIT_ICONS,
+  toPresetIconValue,
+  isPresetIcon,
+} from '../utils/nonprofitIcons';
 
 const socialMediaPlatforms = [
   { name: 'Twitter', icon: FaTwitter, color: '#1da1f2', defaultDomain: 'https://twitter.com/', placeholder: 'https://twitter.com/yourhandle', signupUrl: 'https://twitter.com/i/flow/signup' },
@@ -97,7 +104,7 @@ const normalizeCustomLinks = (links) => {
   }));
 };
 
-function RegistrationForm({ entity, onSave, onCancel, currentUser, onLogout }) {
+function RegistrationForm({ entity, onSave, onCancel, onDirtyChange, currentUser, onLogout }) {
   // Memoize initial form data based on entity
   const initialFormData = useMemo(() => {
     if (entity) {
@@ -140,18 +147,48 @@ function RegistrationForm({ entity, onSave, onCancel, currentUser, onLogout }) {
     };
   }, [entity]);
 
-  const [formData, setFormData] = useState(initialFormData);
+  const mergeDraft = (draft) => {
+    if (!draft) return initialFormData;
+    return {
+      ...initialFormData,
+      ...draft,
+      socialMedia: { ...initialFormData.socialMedia, ...(draft.socialMedia || {}) },
+      customLinks: normalizeCustomLinks(
+        Array.isArray(draft.customLinks) && draft.customLinks.length > 0
+          ? draft.customLinks
+          : initialFormData.customLinks
+      ),
+    };
+  };
+
+  const [formData, setFormData] = useState(() => mergeDraft(loadProfileDraft(entity?.id || null)));
   const [initialData, setInitialData] = useState(() => JSON.stringify(initialFormData));
   const [errors, setErrors] = useState({});
   const [submitted, setSubmitted] = useState(false);
-  const [logoPreview, setLogoPreview] = useState(entity?.logo || null);
+  const [logoPreview, setLogoPreview] = useState(() => {
+    const draft = loadProfileDraft(entity?.id || null);
+    return draft?.logo || entity?.logo || null;
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const dirtyRef = useRef(false);
 
-  // Update form when entity prop changes
-  useEffect(() => {
-    setFormData(initialFormData);
+  const applyDraftOrInitial = (draft) => {
+    if (!draft) {
+      setFormData(initialFormData);
+      setInitialData(JSON.stringify(initialFormData));
+      setLogoPreview(entity?.logo || null);
+      return;
+    }
+    const restored = mergeDraft(draft);
+    setFormData(restored);
     setInitialData(JSON.stringify(initialFormData));
-    setLogoPreview(entity?.logo || null);
+    setLogoPreview(restored.logo || entity?.logo || null);
+  };
+
+  // Update form when entity prop changes; restore unsaved draft if present
+  useEffect(() => {
+    applyDraftOrInitial(loadProfileDraft(entity?.id || null));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- hydrate when the profile being edited changes
   }, [initialFormData, entity]);
 
   const handleCustomLinkChange = (index, field, value) => {
@@ -242,6 +279,34 @@ function RegistrationForm({ entity, onSave, onCancel, currentUser, onLogout }) {
 
   const handleRemoveCustomLinkIcon = (index) => {
     handleCustomLinkChange(index, 'icon', null);
+  };
+
+  const handleSelectPresetIcon = (index, presetId) => {
+    const preset = NONPROFIT_ICONS.find((item) => item.id === presetId);
+    if (!preset) return;
+
+    setFormData((prev) => {
+      const updatedLinks = [...prev.customLinks];
+      const current = updatedLinks[index];
+      const currentName = (current.name || '').trim();
+      const matchesPresetLabel = NONPROFIT_ICONS.some((item) => item.label === currentName);
+      updatedLinks[index] = {
+        ...current,
+        icon: toPresetIconValue(presetId),
+        name: !currentName || matchesPresetLabel ? preset.label : current.name,
+      };
+      return {
+        ...prev,
+        customLinks: updatedLinks,
+      };
+    });
+
+    if (errors[`customLink_${index}_icon`]) {
+      setErrors((prev) => ({
+        ...prev,
+        [`customLink_${index}_icon`]: '',
+      }));
+    }
   };
 
   const handleAddCustomLink = () => {
@@ -439,6 +504,29 @@ function RegistrationForm({ entity, onSave, onCancel, currentUser, onLogout }) {
     return otherFieldsChanged || logoChanged;
   };
 
+  dirtyRef.current = !submitted && !isSubmitting && hasFormChanged();
+
+  useEffect(() => {
+    if (onDirtyChange) onDirtyChange(dirtyRef.current);
+  }, [formData, initialData, submitted, isSubmitting, onDirtyChange]);
+
+  useEffect(() => {
+    if (submitted || isSubmitting) return;
+    if (dirtyRef.current) {
+      saveProfileDraft(entity?.id || null, formData);
+    }
+  }, [formData, entity, submitted, isSubmitting]);
+
+  useEffect(() => {
+    const onBeforeUnload = (e) => {
+      if (!dirtyRef.current) return;
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, []);
+
   const validateForm = () => {
     const newErrors = {};
 
@@ -572,7 +660,7 @@ function RegistrationForm({ entity, onSave, onCancel, currentUser, onLogout }) {
     }
     
     // Rate limiting check
-    const rateLimitCheck = checkRateLimit('form_submission', 5, 15);
+    const rateLimitCheck = checkRateLimit('form_submission', 20, 15);
     if (!rateLimitCheck.allowed) {
       setErrors({
         general: `Too many submissions. Please wait ${rateLimitCheck.timeRemaining} minute(s) before trying again.`
@@ -628,6 +716,7 @@ function RegistrationForm({ entity, onSave, onCancel, currentUser, onLogout }) {
         const savedEntity = await saveEntity(dataToSave, userId);
 
         console.log('Form submitted:', savedEntity);
+        clearProfileDraft(entity?.id || null);
         setSubmitted(true);
         
         setTimeout(() => {
@@ -933,7 +1022,7 @@ function RegistrationForm({ entity, onSave, onCancel, currentUser, onLogout }) {
       <div className="form-section">
         <h2 className="section-title">Custom Links (Optional)</h2>
         <p className="section-description">
-          Add custom links with your own name, icon image, and URL. Start with one link and add as many as you need.
+          Add custom links with a name, icon, and URL. Choose a nonprofit service icon or upload your own image.
         </p>
         <label className="custom-link-checkbox custom-links-layout-option">
           <input
@@ -963,7 +1052,7 @@ function RegistrationForm({ entity, onSave, onCancel, currentUser, onLogout }) {
                 )}
               </div>
               <div className="custom-link-fields">
-                <div className="form-group">
+                <div className="form-group full-width">
                   <label htmlFor={`customLink_${index}_name`}>
                     Name
                   </label>
@@ -973,38 +1062,60 @@ function RegistrationForm({ entity, onSave, onCancel, currentUser, onLogout }) {
                     value={customLink.name}
                     onChange={(e) => handleCustomLinkChange(index, 'name', e.target.value)}
                     className={errors[`customLink_${index}_name`] ? 'error' : ''}
-                    placeholder="e.g., My Portfolio"
+                    placeholder="e.g., Donate, Volunteer"
                     maxLength={100}
                   />
                   {errors[`customLink_${index}_name`] && (
                     <span className="error-message">{errors[`customLink_${index}_name`]}</span>
                   )}
                 </div>
-                <div className="form-group">
-                  <label htmlFor={`customLink_${index}_icon`}>
-                    Icon Image
+                <div className="form-group full-width">
+                  <label>
+                    Icon
                   </label>
-                  <div className="icon-upload-container">
-                    {customLink.icon ? (
-                      <div className="icon-preview-wrapper">
-                        <img 
-                          src={customLink.icon} 
-                          alt={`Custom link ${index + 1} icon`}
-                          className="icon-preview"
-                        />
+                  <p className="icon-picker-hint">Choose a nonprofit service icon or upload your own</p>
+                  <div className="nonprofit-icon-grid" role="listbox" aria-label="Nonprofit service icons">
+                    {NONPROFIT_ICONS.map((preset) => {
+                      const Icon = preset.Icon;
+                      const selected = customLink.icon === toPresetIconValue(preset.id);
+                      return (
                         <button
+                          key={preset.id}
                           type="button"
-                          onClick={() => handleRemoveCustomLinkIcon(index)}
-                          className="remove-icon-button"
-                          title="Remove icon"
+                          role="option"
+                          aria-selected={selected}
+                          className={`nonprofit-icon-option${selected ? ' selected' : ''}`}
+                          onClick={() => handleSelectPresetIcon(index, preset.id)}
+                          title={preset.label}
                         >
-                          <FaTimes />
+                          <Icon style={{ color: preset.color }} />
+                          <span>{preset.label}</span>
                         </button>
-                      </div>
-                    ) : (
-                      <label htmlFor={`customLink_${index}_icon`} className="icon-upload-label">
+                      );
+                    })}
+                  </div>
+                  <div className="icon-upload-container">
+                    <div className="icon-upload-row">
+                      {customLink.icon && !isPresetIcon(customLink.icon) && (
+                        <div className="icon-preview-wrapper">
+                          <CustomLinkIcon
+                            icon={customLink.icon}
+                            alt={`Custom link ${index + 1} icon`}
+                            className="icon-preview"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveCustomLinkIcon(index)}
+                            className="remove-icon-button"
+                            title="Remove icon"
+                          >
+                            <FaTimes />
+                          </button>
+                        </div>
+                      )}
+                      <label htmlFor={`customLink_${index}_icon`} className="icon-upload-label icon-upload-label-compact">
                         <FaImage className="upload-icon" />
-                        <span>Upload Icon</span>
+                        <span>{customLink.icon && !isPresetIcon(customLink.icon) ? 'Replace image' : 'Upload image'}</span>
                         <input
                           type="file"
                           id={`customLink_${index}_icon`}
@@ -1014,7 +1125,16 @@ function RegistrationForm({ entity, onSave, onCancel, currentUser, onLogout }) {
                           style={{ display: 'none' }}
                         />
                       </label>
-                    )}
+                      {customLink.icon && (
+                        <button
+                          type="button"
+                          className="clear-icon-button"
+                          onClick={() => handleRemoveCustomLinkIcon(index)}
+                        >
+                          Clear icon
+                        </button>
+                      )}
+                    </div>
                     {errors[`customLink_${index}_icon`] && (
                       <span className="error-message">{errors[`customLink_${index}_icon`]}</span>
                     )}

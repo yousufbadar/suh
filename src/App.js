@@ -21,6 +21,7 @@ import { getEntities, deactivateEntity, reactivateEntity, deleteEntity, countAno
 import { getTheme, applyTheme } from './utils/theme';
 import { supabase, isClientValid, testConnection } from './lib/supabase';
 import { getCurrentUser, logoutUser, clearUserCache, userFromAuthUser, cacheUserFromAuth } from './utils/auth';
+import { clearProfileDraft, markCreatingProfile, wasCreatingProfile } from './utils/profileDraft';
 import './utils/oauth-diagnostics'; // Load diagnostics helper
 
 const TRIAL_RESTRICTED_PAGES = ['list', 'view', 'dashboard', 'register'];
@@ -67,8 +68,10 @@ function usePaymentSuccessPopup() {
   return isPaymentSuccessPopup;
 }
 
+const IN_PROGRESS_PAGES = ['register', 'view', 'dashboard', 'cart', 'checkout', 'subscription', 'contact', 'admin-coupons', 'admin-profiles'];
+
 function App() {
-  const [currentPage, setCurrentPage] = useState('home'); // 'home', 'list', 'register', 'view', 'edit', 'icons', 'dashboard', 'subscription'
+  const [currentPage, setCurrentPage] = useState(() => (wasCreatingProfile() ? 'register' : 'home')); // 'home', 'list', 'register', 'view', 'edit', 'icons', 'dashboard', 'subscription'
   const [entities, setEntities] = useState([]);
   const [selectedEntity, setSelectedEntity] = useState(null);
   const [editingEntity, setEditingEntity] = useState(null);
@@ -77,6 +80,8 @@ function App() {
   const [entityToDelete, setEntityToDelete] = useState(null);
   const [showPermanentDeleteDialog, setShowPermanentDeleteDialog] = useState(false);
   const [entityToPermanentlyDelete, setEntityToPermanentlyDelete] = useState(null);
+  const [showUnsavedLeaveDialog, setShowUnsavedLeaveDialog] = useState(false);
+  const [registerDirty, setRegisterDirty] = useState(false);
   const [currentTheme, setCurrentTheme] = useState(getTheme());
   const [currentUser, setCurrentUser] = useState(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
@@ -85,6 +90,7 @@ function App() {
   const [subscriptionStatus, setSubscriptionStatus] = useState(null);
   const currentUserRef = useRef(null);
   const entitiesLoadIdRef = useRef(0);
+  const pendingLeaveRef = useRef(null);
   const isPaymentSuccessPopup = usePaymentSuccessPopup();
   const paymentSuccessHandledRef = useRef(false);
   const { count: cartCount } = useCart();
@@ -257,11 +263,18 @@ function App() {
                     console.log('✅ User from session:', user?.email);
 
                     if (event === 'SIGNED_IN') {
-                      console.log('🔄 SIGNED_IN event - updating user state and navigating to profiles list');
-                      setCurrentPage('list');
+                      const alreadySignedIn = currentUserRef.current?.id === user.id;
+                      currentUserRef.current = user;
                       setCurrentUser(user);
                       setShowLogin(false);
+                      if (alreadySignedIn) {
+                        console.log('🔐 SIGNED_IN event - session recovered, keeping current page');
+                      } else {
+                        console.log('🔄 SIGNED_IN event - new login, navigating unless work is in progress');
+                        setCurrentPage((prev) => (IN_PROGRESS_PAGES.includes(prev) ? prev : 'list'));
+                      }
                     } else {
+                      currentUserRef.current = user;
                       setCurrentUser(prevUser => {
                         if (!prevUser || prevUser.id !== user.id) {
                           console.log('🔄 Updating user state from auth listener');
@@ -436,14 +449,50 @@ function App() {
     }
   }, [isTrialEnded, currentPage, currentUser]);
 
+  useEffect(() => {
+    markCreatingProfile(currentPage === 'register' && !editingEntity);
+    if (currentPage !== 'register') {
+      setRegisterDirty(false);
+    }
+  }, [currentPage, editingEntity]);
+
+  const handleRegisterDirtyChange = useCallback((dirty) => {
+    setRegisterDirty(Boolean(dirty));
+  }, []);
+
+  const tryLeaveRegister = useCallback((navigateFn) => {
+    if (currentPage === 'register' && registerDirty) {
+      pendingLeaveRef.current = navigateFn;
+      setShowUnsavedLeaveDialog(true);
+      return;
+    }
+    navigateFn();
+  }, [currentPage, registerDirty]);
+
+  const confirmUnsavedLeave = () => {
+    const navigateFn = pendingLeaveRef.current;
+    pendingLeaveRef.current = null;
+    setShowUnsavedLeaveDialog(false);
+    setRegisterDirty(false);
+    clearProfileDraft(editingEntity?.id || null);
+    if (navigateFn) navigateFn();
+  };
+
+  const cancelUnsavedLeave = () => {
+    pendingLeaveRef.current = null;
+    setShowUnsavedLeaveDialog(false);
+  };
+
   const checkAuth = async () => {
     try {
       const user = await getCurrentUser(false); // Use cache if available (respects 1 minute limit)
+      currentUserRef.current = user;
       setCurrentUser(user);
       // Don't set showLogin here - let the render logic handle it based on currentPage
       setShowLogin(false);
     } catch (error) {
       console.error('Auth check error:', error);
+      currentUserRef.current = null;
       setCurrentUser(null);
       // Don't set showLogin here - let the render logic handle it
       setShowLogin(false);
@@ -464,10 +513,11 @@ function App() {
       // Set navigation and user state FIRST (before any async operations)
       // This ensures the UI updates immediately and prevents login screen from showing
       console.log('🔄 Setting user state and navigation immediately...');
+      currentUserRef.current = user;
       setShowLogin(false);
       setCurrentUser(user);
-      // After login, take user to the profiles (list) page
-      setCurrentPage('list');
+      // After login, take user to the profiles (list) page unless restoring create-profile work
+      setCurrentPage((prev) => (prev === 'register' ? prev : 'list'));
       
       console.log('✅ Navigation and user state updated immediately');
       console.log('   - Current page: list');
@@ -497,34 +547,36 @@ function App() {
 
   const handleLogout = async (e) => {
     if (e?.preventDefault) e.preventDefault();
-    try {
-      console.log('🔐 Logout initiated...');
-      clearUserCache();
-      // Clear user state first so no effect schedules profile fetches with old user id
-      currentUserRef.current = null;
-      entitiesLoadIdRef.current += 1;
-      setCurrentUser(null);
-      setEntities([]);
-      setSubscriptionStatus(null);
-      setShowLogin(false);
-      setCurrentPage('home');
+    const doLogout = async () => {
+      try {
+        console.log('🔐 Logout initiated...');
+        clearUserCache();
+        // Clear user state first so no effect schedules profile fetches with old user id
+        currentUserRef.current = null;
+        entitiesLoadIdRef.current += 1;
+        setCurrentUser(null);
+        setEntities([]);
+        setSubscriptionStatus(null);
+        setShowLogin(false);
+        setCurrentPage('home');
 
-      await logoutUser();
-      console.log('✅ Logout completed, user state cleared');
-      
-    } catch (error) {
-      console.error('❌ Logout error:', error);
-      currentUserRef.current = null;
-      entitiesLoadIdRef.current += 1;
-      setCurrentUser(null);
-      setEntities([]);
-      setSubscriptionStatus(null);
-      setShowLogin(false);
-      setCurrentPage('home');
-      
-      // Show error to user
-      alert('Logout encountered an error, but you have been signed out locally. Please refresh the page if you continue to see issues.');
-    }
+        await logoutUser();
+        console.log('✅ Logout completed, user state cleared');
+      } catch (error) {
+        console.error('❌ Logout error:', error);
+        currentUserRef.current = null;
+        entitiesLoadIdRef.current += 1;
+        setCurrentUser(null);
+        setEntities([]);
+        setSubscriptionStatus(null);
+        setShowLogin(false);
+        setCurrentPage('home');
+
+        // Show error to user
+        alert('Logout encountered an error, but you have been signed out locally. Please refresh the page if you continue to see issues.');
+      }
+    };
+    tryLeaveRegister(doLogout);
   };
 
 
@@ -639,22 +691,31 @@ function App() {
   };
 
   const handleRegisterNew = () => {
-    if (isTrialEnded) {
-      setCurrentPage('subscription');
+    const go = () => {
+      if (isTrialEnded) {
+        setCurrentPage('subscription');
+        return;
+      }
+      setEditingEntity(null);
+      setCurrentPage('register');
+    };
+    if (currentPage === 'register' && editingEntity && registerDirty) {
+      tryLeaveRegister(go);
       return;
     }
-    setEditingEntity(null);
-    setCurrentPage('register');
+    go();
   };
 
   const handleBackToList = () => {
-    if (isTrialEnded) {
-      setCurrentPage('subscription');
-      return;
-    }
-    setSelectedEntity(null);
-    setEditingEntity(null);
-    setCurrentPage('list');
+    tryLeaveRegister(() => {
+      if (isTrialEnded) {
+        setCurrentPage('subscription');
+        return;
+      }
+      setSelectedEntity(null);
+      setEditingEntity(null);
+      setCurrentPage('list');
+    });
   };
 
   const handleGetStarted = () => {
@@ -671,8 +732,10 @@ function App() {
   };
 
   const handleEntitySaved = () => {
+    clearProfileDraft(editingEntity?.id || null);
     loadEntities();
     setEditingEntity(null);
+    setRegisterDirty(false);
     setCurrentPage('list');
   };
 
@@ -925,14 +988,24 @@ function App() {
         onConfirm={confirmPermanentDelete}
         onCancel={cancelPermanentDelete}
       />
-      <SiteBanner compact onLogoClick={() => setCurrentPage('home')} />
+      <ConfirmDialog
+        isOpen={showUnsavedLeaveDialog}
+        title="Unsaved Profile Changes"
+        message="You have unsaved changes on this profile. Leave without saving?"
+        confirmText="Leave without saving"
+        cancelText="Stay"
+        type="warning"
+        onConfirm={confirmUnsavedLeave}
+        onCancel={cancelUnsavedLeave}
+      />
+      <SiteBanner compact onLogoClick={() => tryLeaveRegister(() => setCurrentPage('home'))} />
       <div className="container">
         <nav className="app-nav">
           <button
             onClick={() => {
               console.log('🏠 Home button clicked');
               console.log('👤 User session before navigation:', currentUser ? `Logged in as ${currentUser.email}` : 'Not logged in');
-              setCurrentPage('home');
+              tryLeaveRegister(() => setCurrentPage('home'));
               // User session is preserved - just changing the page
             }}
             className={`nav-button ${currentPage === 'home' ? 'active' : ''}`}
@@ -953,7 +1026,7 @@ function App() {
           </button>
           <button
             type="button"
-            onClick={() => setCurrentPage('cart')}
+            onClick={() => tryLeaveRegister(() => setCurrentPage('cart'))}
             className={`nav-button ${currentPage === 'cart' ? 'active' : ''}`}
             title="Cart"
           >
@@ -961,7 +1034,7 @@ function App() {
           </button>
           <button
             type="button"
-            onClick={() => setCurrentPage('contact')}
+            onClick={() => tryLeaveRegister(() => setCurrentPage('contact'))}
             className={`nav-button ${currentPage === 'contact' ? 'active' : ''}`}
           >
             Contact
@@ -970,14 +1043,14 @@ function App() {
             <>
               <button
                 type="button"
-                onClick={() => setCurrentPage('admin-profiles')}
+                onClick={() => tryLeaveRegister(() => setCurrentPage('admin-profiles'))}
                 className={`nav-button ${currentPage === 'admin-profiles' ? 'active' : ''}`}
               >
                 All Profiles
               </button>
               <button
                 type="button"
-                onClick={() => setCurrentPage('admin-coupons')}
+                onClick={() => tryLeaveRegister(() => setCurrentPage('admin-coupons'))}
                 className={`nav-button ${currentPage === 'admin-coupons' ? 'active' : ''}`}
               >
                 Coupons
@@ -1027,6 +1100,7 @@ function App() {
               entity={editingEntity}
               onSave={handleEntitySaved}
               onCancel={handleBackToList}
+              onDirtyChange={handleRegisterDirtyChange}
               currentUser={currentUser}
               onLogout={handleLogout}
             />

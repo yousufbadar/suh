@@ -26,6 +26,7 @@ import {
 } from 'react-icons/fa';
 import { FaXTwitter } from 'react-icons/fa6';
 import { SiGooglemaps } from 'react-icons/si';
+import CustomLinkIcon from './CustomLinkIcon';
 
 const socialMediaPlatforms = {
   facebook: { name: 'Facebook', icon: FaFacebook, color: '#1877f2' },
@@ -257,8 +258,8 @@ function SocialMediaIconsPage({ uuid }) {
     >
       <div className="custom-link-button-content">
         {customLink.icon ? (
-          <img
-            src={customLink.icon}
+          <CustomLinkIcon
+            icon={customLink.icon}
             alt={`${customLink.name} icon`}
             className="custom-link-icon-image-page"
           />

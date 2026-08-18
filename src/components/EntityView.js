@@ -38,6 +38,7 @@ import {
   FaSignOutAlt,
 } from 'react-icons/fa';
 import { FaXTwitter } from 'react-icons/fa6';
+import CustomLinkIcon from './CustomLinkIcon';
 import { SiGooglemaps } from 'react-icons/si';
 
 const socialMediaPlatforms = {
@@ -358,8 +359,8 @@ function EntityView({ entity, onBack, onEdit, onDelete, onPermanentDelete, onVie
                       style={{ backgroundColor: '#32cd3215' }}
                     >
                       {customLink.icon && (
-                        <img 
-                          src={customLink.icon} 
+                        <CustomLinkIcon
+                          icon={customLink.icon}
                           alt={`${customLink.name} icon`}
                           className="custom-link-icon-image"
                         />
